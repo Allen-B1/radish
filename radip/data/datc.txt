@@ -1,0 +1,16 @@
+#6A1: F NTH England
+F NTH -> Pic @ F
+
+#6A2: A Lvp England
+A Lvp -> IRI @ F
+
+#6A3: F Kiel Germany
+F Kiel -> Munich @ F
+
+#6A12: A Vie Austria, A Mun Germany, A Ven Italy
+A Vie -> Tyr @ F
+A Mun -> Tyr @ F
+A Ven -> Tyr @ F
+
+#6B1: F Por France
+F Por -> Spa @ F
