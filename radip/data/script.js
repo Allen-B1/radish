@@ -371,7 +371,10 @@ for (let child of xml.children[0].children) {
         		Array.prototype.push.apply(json.army_adj, targets.map(x => [abbr, x]));
             break;
         default:
-        		Array.prototype.push.apply(json.fleet_adj, targets.map(x => [[abbr, coast], [x.split("-")[0], x.split("-")[1] || ""]]));        
+        		Array.prototype.push.apply(json.fleet_adj, targets.map(x => [[abbr, coast], [x.split("-")[0], x.split("-")[1] || ""]]));
+        		Array.prototype.push.apply(json.fleet_adj, targets.map(x => [[abbr, coast], [x.split("-")[0], ""]]));
+        		Array.prototype.push.apply(json.fleet_adj, targets.map(x => [[abbr, ""], [x.split("-")[0], x.split("-")[1] || ""]]));
+        		Array.prototype.push.apply(json.fleet_adj, targets.map(x => [[abbr, ""], [x.split("-")[0], ""]]));
         }
         
         if (coast && coast != "mv") {
@@ -385,5 +388,8 @@ for (let child of xml.children[0].children) {
         is_sea: !is_land
     };
 }
+
+json.fleet_adj = [...new Set(json.fleet_adj)];
+json.fleet_adj.sort();
 
 document.write(JSON.stringify(json));
