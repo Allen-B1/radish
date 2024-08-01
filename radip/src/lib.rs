@@ -4,8 +4,9 @@
 //! This crate does not support build phases, as those are fairly easy to implement on your own, and
 //! build phases may differ for different variants.
 
-use std::{any::Any, clone, collections::{HashMap, HashSet}, hash::Hash, ops::Deref};
+use std::{any::Any, clone, collections::{HashMap, HashSet}, fmt::Debug, ops::Deref};
 pub mod builtin;
+mod test;
 
 pub type ProvinceAbbr = String;
 
@@ -53,9 +54,20 @@ impl Unit {
 /// an associated order.
 pub type Orders = HashMap<String, Box<dyn Order>>;
 
-/// Any custom order type should implement both this trait and `Clone`.
-/// See [`Order`] for more information.
-pub trait OrderImpl: 'static {
+pub trait AsAny {
+    fn as_any(&self) -> &dyn Any;
+}
+
+impl<T: Any> AsAny for T {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+}
+
+/// Represents an order object.
+/// 
+/// Downcasting is supported via [`Any::downcast_ref`](std::any::Any::downcast_ref) and [`Any::is`](std::any::Any::is).
+pub trait Order: 'static + Debug + AsAny {
     /// Return orders (identified by source province) that this order depends on
     /// for resolution.
     fn deps(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str) -> HashSet<String>;
@@ -65,35 +77,10 @@ pub trait OrderImpl: 'static {
     fn adjudicate(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str, order_status: &HashMap<String, bool>) -> Option<bool>;
 }
 
-/// Represents an order object.
-/// Do not implement this trait directly; instead, implement [`OrderImpl`].
-/// 
-/// Downcasting is supported via [`Any::downcast_ref`](std::any::Any::downcast_ref) and [`Any::is`](std::any::Any::is).
-pub trait Order: OrderImpl {
-    fn as_any(&self) -> &dyn Any;
-    fn as_owned_order(&self) -> Box<dyn Order>;
-}
-
-impl<T: OrderImpl + Clone> Order for T {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn as_owned_order(&self) -> Box<dyn Order> {
-        Box::new(self.clone())
-    }
-}
-
 impl Deref for dyn Order {
     type Target = dyn Any;
     fn deref(&self) -> &Self::Target {
         self.as_any()
-    }
-}
-
-impl Clone for Box<dyn Order> {
-    fn clone(&self) -> Self {
-        self.as_owned_order()
     }
 }
 
@@ -123,12 +110,18 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
             }
         }
 
+        if order_status.len() == orders.len() {
+            break
+        }
+
         if order_status.len() != num_resolved {
             // skip paradox step if an order was resolved
             continue
         }
 
         // cycles & paradoxes
+//        panic!("cycle or paradox")
+        break
     }
 
     order_status

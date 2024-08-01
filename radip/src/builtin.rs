@@ -2,9 +2,9 @@
 
 use std::{collections::{HashMap, HashSet}, ops::Deref};
 use serde::{Serialize,Deserialize};
-use crate::{FleetLoc, Map, MapState, Order, OrderImpl, Orders, Province, ProvinceAbbr, Unit};
+use crate::{FleetLoc, Map, MapState, Order, Orders, Province, ProvinceAbbr, Unit};
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct Hold;
 
 pub fn deps_for_hold(map: &crate::Map, state: &crate::MapState, orders: &crate::Orders, this_prov: &str) -> HashSet<String> {
@@ -38,7 +38,7 @@ pub fn is_dislodged(map: &crate::Map, state: &crate::MapState, orders: &crate::O
     }
 }
 
-impl OrderImpl for Hold {
+impl Order for Hold {
     fn deps(&self, map: &crate::Map, state: &crate::MapState, orders: &crate::Orders, this_prov: &str) -> HashSet<String> {
         deps_for_hold(map, state, orders, this_prov)
     }
@@ -48,7 +48,7 @@ impl OrderImpl for Hold {
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct Move {
     pub dest: FleetLoc
 }
@@ -63,13 +63,13 @@ impl Move {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Bounds {
     pub min: u32,
     pub max: u32,
 }
 
-impl OrderImpl for Move {
+impl Order for Move {
     fn deps(&self, map: &crate::Map, state: &crate::MapState, orders: &crate::Orders, this_prov: &str) -> HashSet<String> {
         let mut deps = HashSet::new();
         for (src2, order2) in orders {
@@ -101,23 +101,36 @@ impl OrderImpl for Move {
 
         let mut strengths: Vec<Bounds> = Vec::new();
         if orders.contains_key(&self.dest.0) && Move::is_move_to(orders[&self.dest.0].deref(), this_prov) {
-            // TODO: don't think this works?
-            if is_convoy_path(map, state, orders, order_status, this_prov) != Some(true) {
+            if (is_convoy_path(map, state, orders, order_status, this_prov) == Some(true) ||
+                is_convoy_path(map, state, orders, order_status, &self.dest.0) == Some(true))
+                && order_status.get(&self.dest.0).map(|x| *x) == Some(true)
+             {
+                // convoy swapping
+            } else if (is_convoy_path(map, state, orders, order_status, this_prov) == None ||
+                is_convoy_path(map, state, orders, order_status, &self.dest.0) == None) 
+                && order_status.get(&self.dest.0).map(|x| *x) != Some(false) {
+                let mut def = compute_defend_strength(map, state, orders, order_status, self.dest.0.as_str());
+                def.min = 0;
+                strengths.push(def);
+            } else {
                 // head-to-head battle
                 strengths.push(compute_defend_strength(map, state, orders, order_status, self.dest.0.as_str()));
             }
+            // still needs to overcome hold strength :P
+            strengths.push(compute_hold_strength(map, state, orders, order_status, self.dest.0.as_str()));
         } else {
             strengths.push(compute_hold_strength(map, state, orders, order_status, self.dest.0.as_str()));
             // not head-to-head battle
         }
 
         for (province2, order2) in orders.iter() {
-            if Move::is_move_to(order2.deref(), self.dest.0.as_str()) {
+            if Move::is_move_to(order2.deref(), self.dest.0.as_str()) &&  province2 != this_prov {
                 strengths.push(compute_prevent_strength(map, state, orders, order_status, province2.as_str()));
             }
         }
 
         let mut beats_all_bounds = true;
+        println!("{} | attack: {:?} | defends: {:?}", this_prov, attack_strength, strengths);
         for strength in strengths.iter() {
             if attack_strength.max <= strength.min {
                 return Some(false);
@@ -134,34 +147,49 @@ impl OrderImpl for Move {
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct SupportHold {
     pub target: ProvinceAbbr
 }
 
 pub fn deps_for_tap(map: &Map, state: &MapState, orders: &Orders, this_prov: &str) -> HashSet<String> {
     let mut deps = HashSet::new();
-    for (prov, order) in orders.iter() {
-        if let Some(sup) = order.downcast_ref::<Convoy>() {
+    for (prov_it, order_it) in orders.iter() {
+        if Move::is_move_to(order_it.deref(), this_prov) {
+            deps.insert(prov_it.to_string());
+        }
+        if let Some(sup) = order_it.downcast_ref::<Convoy>() {
             if sup.dest == this_prov && orders.contains_key(&sup.src) && Move::is_move_to(orders[&sup.src].deref(), &sup.dest) {
-                deps.insert(prov.to_string());
+                deps.insert(prov_it.to_string());
             }
         }
     }
     deps
 }
 
-pub fn is_untapped(map: &Map, state: &MapState, orders: &Orders, order_status: &HashMap<String, bool>, this_prov: &str) -> Option<bool> {
+pub fn is_untapped(map: &Map, state: &MapState, orders: &Orders, order_status: &HashMap<String, bool>, this_prov: &str, exception: &str) -> Option<bool> {
     let mut possibly_tapped = false;
-    for (prov, order) in orders.iter() {
-        if Move::is_move_to(order.deref(), this_prov) {
-            match is_path(map, state, orders, order_status, this_prov) {
-                Some(true) => return Some(false),
-                None => { possibly_tapped = true }
-                Some(false) => {}
+    for (prov_it, order_it) in orders.iter() {
+        if Move::is_move_to(order_it.deref(), this_prov) {
+            if state.units[prov_it].nationality() == state.units[this_prov].nationality() {
+                continue
+            }
+
+            if prov_it == exception {
+                match order_status.get(prov_it).map(|x| *x) {
+                    Some(true) => return Some(false),
+                    None => { possibly_tapped = true },
+                    Some(false) => {}
+                }
+            } else {
+                match is_path(map, state, orders, order_status, prov_it) {
+                    Some(true) => return Some(false),
+                    None => { possibly_tapped = true }
+                    Some(false) => {}
+                }
             }
         }
-    }   
+    }
 
     if possibly_tapped {
         None
@@ -170,7 +198,7 @@ pub fn is_untapped(map: &Map, state: &MapState, orders: &Orders, order_status: &
     }
 }
 
-impl OrderImpl for SupportHold {
+impl Order for SupportHold {
     fn deps(&self, map: &crate::Map, state: &crate::MapState, orders: &crate::Orders, this_prov: &str) -> HashSet<String> {
         if !orders.contains_key(&self.target) || orders[&self.target].is::<Move>() {
             HashSet::new()
@@ -183,12 +211,12 @@ impl OrderImpl for SupportHold {
         if !orders.contains_key(&self.target) || orders[&self.target].is::<Move>() {
             Some(false)
         } else {
-            is_untapped(map, state, orders, order_status, this_prov)
+            is_untapped(map, state, orders, order_status, this_prov, "")
         }
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct SupportMove {
     pub src: ProvinceAbbr,
     pub dest: ProvinceAbbr
@@ -200,9 +228,16 @@ impl SupportMove {
     }
 }
 
-impl OrderImpl for SupportMove {
+fn unit_can_reach(map: &Map, state: &MapState, src: &str, dest: &str) -> bool {
+    match &state.units[src] {
+        Unit::Army(_) => map.army_adj.contains(&(src.to_string(), dest.to_string())),
+        Unit::Fleet(_, coast) =>  map.fleet_adj.contains(&((src.to_string(), coast.to_string()), (dest.to_string(), "".to_string())))
+    }
+}
+
+impl Order for SupportMove {
     fn deps(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str) -> HashSet<String> {
-        if !orders.contains_key(&self.src) || !Move::is_move_to(orders[&self.src].deref(), &self.dest) {
+        if !orders.contains_key(&self.src) || !Move::is_move_to(orders[&self.src].deref(), &self.dest) || !unit_can_reach(map, state, this_prov, &self.dest) {
             HashSet::new()
         } else {
             deps_for_tap(map, state, orders, this_prov)
@@ -210,21 +245,21 @@ impl OrderImpl for SupportMove {
     }
 
     fn adjudicate(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str, order_status: &HashMap<String, bool>) -> Option<bool> {
-        if !orders.contains_key(&self.src) || !Move::is_move_to(orders[&self.src].deref(), &self.dest) {
+        if !orders.contains_key(&self.src) || !Move::is_move_to(orders[&self.src].deref(), &self.dest) || !unit_can_reach(map, state, this_prov, &self.dest) {
             Some(false)
         } else {
-            is_untapped(map, state, orders, order_status, this_prov)
+            is_untapped(map, state, orders, order_status, this_prov, &self.dest)
         }
     }
 }
 
-#[derive(PartialEq, Clone, Serialize, Deserialize)]
+#[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct Convoy {
     pub src: ProvinceAbbr,
     pub dest: ProvinceAbbr
 }
 
-impl OrderImpl for Convoy {
+impl Order for Convoy {
     fn deps(&self, map: &crate::Map, state: &crate::MapState, orders: &crate::Orders, this_prov: &str) -> HashSet<String> {
         deps_for_hold(map, state, orders, this_prov)
     }
@@ -299,7 +334,6 @@ pub fn compute_attack_strength(map: &Map, state: &MapState, orders: &Orders, ord
     };
 
     let src_nationality = state.units.get(src).map(Unit::nationality).expect("empty unit in source of move order");
-
     if possible_dest_nationality == Some(src_nationality.clone()) && dest_nationality_certain {
         return Bounds { min : 0, max : 0 }
     }
@@ -412,7 +446,7 @@ fn is_path_along(map: &Map, src: &str, dest: &str, convoys: &[String]) -> bool {
             None => return false
         };
 
-        if map.fleet_adj.contains(&((node.to_string(), "".to_string()), (dest.to_string(), "".to_string()))) {
+        if map.fleet_adj.contains(&((node.to_string(), "".to_string()), (dest.to_string(), "".to_string()))) && visited.len() != 0 {
             return true
         }
 
@@ -430,16 +464,24 @@ fn is_path_along(map: &Map, src: &str, dest: &str, convoys: &[String]) -> bool {
 }
 
 pub fn is_convoy_path(map: &Map, state: &MapState, orders: &Orders, order_status: &HashMap<String, bool>, src: &str) -> Option<bool> {
-    let (dest_prov, dest_coast) = &orders[src].downcast_ref::<Move>().expect("is_convoy_path should have move order").dest;
+    let (dest_prov, _) = &orders[src].downcast_ref::<Move>().expect("is_convoy_path should have move order").dest;
 
     match state.units.get(src).expect("unit does not exist in is_path") {
         Unit::Fleet(_, _) => return Some(false),
         _ => {}
     }
 
+    if map.provinces[dest_prov].is_sea {
+        return Some(false)
+    }
+
     let mut possible_convoys = Vec::new();
     let mut definite_convoys = Vec::new();
     for (prov_it, order_it) in orders.iter() {
+        if !map.provinces[prov_it].is_sea {
+            continue
+        }
+
         let convoy = match order_it.downcast_ref::<Convoy>() {
             Some(c) => c,
             None => continue

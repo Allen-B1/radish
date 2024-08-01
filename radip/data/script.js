@@ -357,10 +357,10 @@ let json = {
 for (let child of xml.children[0].children) {
   	let abbr = child.getAttribute("shortname");
     let name = child.getAttribute("fullname");
-		let coasts = [];
+	let coasts = [];
     let is_land = false;
-		for (let adj of child.children) {
-    		if (adj.tagName.toLowerCase() != "adjacency") continue;
+	for (let adj of child.children) {
+    	if (adj.tagName.toLowerCase() != "adjacency") continue;
         
         let coast = adj.getAttribute("type");
         coast = coast == "xc" ? "": coast;
@@ -383,7 +383,7 @@ for (let child of xml.children[0].children) {
     }
 
     json.provinces[abbr] = {
-    		name: name,
+    	name: name,
         coasts: coasts,
         is_sea: !is_land
     };
