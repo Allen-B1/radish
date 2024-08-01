@@ -1,10 +1,16 @@
 //! Diplomacy adjucator, based on [Kruijswijk's specification](https://webdiplomacy.net/doc/DATC_v3_0.html).
-//! 
+//!
 //! Use [`adjudicate`] to adjudicate a movement phase, and [`utils::apply_adjudication`] to update the map.
 //! This crate does not support build phases, as those are fairly easy to implement on your own, and
 //! build phases may differ for different variants.
 
-use std::{any::Any, clone, collections::{HashMap, HashSet}, fmt::Debug, ops::Deref};
+use std::{
+    any::Any,
+    clone,
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+    ops::Deref,
+};
 pub mod builtin;
 mod test;
 
@@ -13,20 +19,20 @@ pub type ProvinceAbbr = String;
 pub type FleetLoc = (ProvinceAbbr, String);
 pub type ArmyLoc = ProvinceAbbr;
 
-use serde::{Serialize,Deserialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Province {
     pub name: String,
     pub coasts: HashSet<String>,
-    pub is_sea: bool
+    pub is_sea: bool,
 }
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Map {
     pub provinces: HashMap<ProvinceAbbr, Province>,
     pub fleet_adj: HashSet<(FleetLoc, FleetLoc)>,
-    pub army_adj: HashSet<(ArmyLoc, ArmyLoc)>
+    pub army_adj: HashSet<(ArmyLoc, ArmyLoc)>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -45,7 +51,7 @@ impl Unit {
     pub fn nationality(&self) -> String {
         match self {
             Unit::Army(s) => s.clone(),
-            Unit::Fleet(s, _) => s.clone()
+            Unit::Fleet(s, _) => s.clone(),
         }
     }
 }
@@ -65,16 +71,29 @@ impl<T: Any> AsAny for T {
 }
 
 /// Represents an order object.
-/// 
+///
 /// Downcasting is supported via [`Any::downcast_ref`](std::any::Any::downcast_ref) and [`Any::is`](std::any::Any::is).
 pub trait Order: 'static + Debug + AsAny {
     /// Return orders (identified by source province) that this order depends on
     /// for resolution.
-    fn deps(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str) -> HashSet<String>;
+    fn deps(
+        &self,
+        map: &Map,
+        state: &MapState,
+        orders: &Orders,
+        this_prov: &str,
+    ) -> HashSet<String>;
 
     /// Based on the given `order_status` information, determine whether
     /// this order succeeds or fails.
-    fn adjudicate(&self, map: &Map, state: &MapState, orders: &Orders, this_prov: &str, order_status: &HashMap<String, bool>) -> Option<bool>;
+    fn adjudicate(
+        &self,
+        map: &Map,
+        state: &MapState,
+        orders: &Orders,
+        this_prov: &str,
+        order_status: &HashMap<String, bool>,
+    ) -> Option<bool>;
 }
 
 impl Deref for dyn Order {
@@ -92,7 +111,7 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
 
         for (prov, order) in orders.iter() {
             if order_status.contains_key(prov) {
-                continue
+                continue;
             }
 
             let deps = order.deps(&map, &state, &orders, prov);
@@ -105,23 +124,25 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
             }
 
             match order.adjudicate(&map, &state, &orders, prov, &restricted_order_status) {
-                Some(status) => { order_status.insert(prov.to_string(), status); },
+                Some(status) => {
+                    order_status.insert(prov.to_string(), status);
+                }
                 None => {}
             }
         }
 
         if order_status.len() == orders.len() {
-            break
+            break;
         }
 
         if order_status.len() != num_resolved {
             // skip paradox step if an order was resolved
-            continue
+            continue;
         }
 
         // cycles & paradoxes
-//        panic!("cycle or paradox")
-        break
+        //        panic!("cycle or paradox")
+        break;
     }
 
     order_status
