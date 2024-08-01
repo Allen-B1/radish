@@ -1,4 +1,6 @@
-//! Hold, move, support, and convoy orders, along with associated utilities.
+//! Orders present in the default version of the game.
+//! These implementations follow Kruijswijk's specifications in [his excellent article](https://diplom.org/Zine/S2009M/Kruijswijk/DipMath_Chp2.htm)
+//! on adjudication.
 
 use crate::{FleetLoc, Map, MapState, Order, Orders, Province, ProvinceAbbr, Unit};
 use serde::{Deserialize, Serialize};
@@ -75,6 +77,13 @@ impl Order for Hold {
     }
 }
 
+/// A move order.
+/// 
+/// The move order succeeds iff the attack strength is greater than
+/// the hold strength of the opposing unit and the prevent strength of all other units
+/// moving to the same destination.
+/// In the case of a head-to-head battle, the attack strength must also
+/// be greater than the defend strength of the opposing unit.
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct Move {
     pub dest: FleetLoc,
@@ -90,6 +99,27 @@ impl Move {
             .downcast_ref::<Move>()
             .map(|m| m.is_to(prov))
             .unwrap_or(false);
+    }
+}
+
+/// Compute whether the given order is in a head-to-head battle.
+pub fn is_head_to_head(
+    map: &crate::Map,
+    state: &crate::MapState,
+    orders: &crate::Orders,
+    order_status: &std::collections::HashMap<String, bool>,
+    src: &str,
+) -> Option<bool> {
+    let (dest_prov, _) = &orders[src].downcast_ref::<Move>().expect("is_head_to_head not given move order").dest;
+    
+    if !(orders.contains_key(dest_prov) && Move::is_move_to(orders[dest_prov].deref(), src)) {
+        return Some(false)
+    }
+
+    match (is_convoy_path(map, state, orders, order_status, src), is_convoy_path(map, state, orders, order_status, dest_prov)) {
+        (Some(true), _) | (_, Some(true)) => Some(false),
+        (None, _) | (_, None) => None,
+        (Some(false), Some(false)) => Some(true)
     }
 }
 
@@ -118,7 +148,7 @@ impl Order for Move {
                 }
             }
             if let Some(sup) = order2.downcast_ref::<Convoy>() {
-                if sup.dest == self.dest.0
+                if (sup.dest == self.dest.0 || sup.src == self.dest.0) // second clause required to compute whether self.dest is part of head-to-head battle
                     && orders.contains_key(&sup.src)
                     && Move::is_move_to(orders[&sup.src].deref(), &sup.dest)
                 {
@@ -137,6 +167,17 @@ impl Order for Move {
 
         if orders.contains_key(&self.dest.0) && orders[&self.dest.0].is::<Move>() {
             deps.insert(self.dest.0.clone());
+
+            if Move::is_move_to(orders[&self.dest.0].deref(), this_prov) {
+                // possible head-to-head
+                for (src2, order2) in orders {
+                    if let Some(sup) = order2.downcast_ref::<SupportMove>() {
+                        if sup.src == self.dest.0 && sup.dest == this_prov {
+                            deps.insert(src2.to_string());
+                        }
+                    }
+                }
+            }
         }
         deps
     }
@@ -155,30 +196,20 @@ impl Order for Move {
         if orders.contains_key(&self.dest.0)
             && Move::is_move_to(orders[&self.dest.0].deref(), this_prov)
         {
-            if (is_convoy_path(map, state, orders, order_status, this_prov) == Some(true)
-                || is_convoy_path(map, state, orders, order_status, &self.dest.0) == Some(true))
-                && order_status.get(&self.dest.0).map(|x| *x) == Some(true)
-            {
-                // convoy swapping
-            } else if (is_convoy_path(map, state, orders, order_status, this_prov) == None
-                || is_convoy_path(map, state, orders, order_status, &self.dest.0) == None)
-                && order_status.get(&self.dest.0).map(|x| *x) != Some(false)
-            {
-                let mut def =
-                    compute_defend_strength(map, state, orders, order_status, self.dest.0.as_str());
-                def.min = 0;
-                strengths.push(def);
-            } else {
-                // head-to-head battle
-                strengths.push(compute_defend_strength(
-                    map,
-                    state,
-                    orders,
-                    order_status,
-                    self.dest.0.as_str(),
-                ));
+            let is_hth = is_head_to_head(map, state, orders, order_status, this_prov);
+            match is_hth {
+                Some(false) => {},
+                None => {
+                    let mut def = compute_defend_strength(map, state, orders, order_status, self.dest.0.as_str());
+                    def.min = 0;
+                    strengths.push(def);   
+                },
+                Some(true) => {
+                    let def = compute_defend_strength(map, state, orders, order_status, self.dest.0.as_str());
+                    strengths.push(def);
+                }
             }
-            // still needs to overcome hold strength :P
+
             strengths.push(compute_hold_strength(
                 map,
                 state,
@@ -383,6 +414,8 @@ impl Order for SupportMove {
         this_prov: &str,
         order_status: &HashMap<String, bool>,
     ) -> Option<bool> {
+//        println!("unit {} can {}: {}", this_prov, self.dest, unit_can_reach(map, state, this_prov, &self.dest));
+
         if !orders.contains_key(&self.src)
             || !Move::is_move_to(orders[&self.src].deref(), &self.dest)
             || !unit_can_reach(map, state, this_prov, &self.dest)
@@ -426,6 +459,9 @@ impl Order for Convoy {
 // compute attack, defend, and prevent strengths
 
 /// Compute the [defend strength](https://webdiplomacy.net/doc/DATC_v3_0.html#5.B.7) of the given move order.
+/// 
+/// If the path of the move order is not successful, then the defend strength is 0.  
+/// Otherwise, the defend strength is 1 + the number of successful support orders.
 pub fn compute_defend_strength(
     map: &Map,
     state: &MapState,
@@ -454,6 +490,7 @@ pub fn compute_defend_strength(
                 }
                 Some(false) => {}
                 None => {
+//                    println!("possible support for {}: {}", src, province2);
                     bounds.max += 1;
                 }
             }
@@ -468,6 +505,10 @@ pub fn compute_defend_strength(
 }
 
 /// Compute the [prevent strength](https://webdiplomacy.net/doc/DATC_v3_0.html#5.B.6) of the given move order.
+/// 
+/// If the move is part of a head-to-head battle and the opposing move is successful, the prevent strength is 0.
+/// If the path of the move order is not successful, then the defend strength is 0.  
+/// Otherwise, the defend strength is 1 + the number of successful support orders.
 pub fn compute_prevent_strength(
     map: &Map,
     state: &MapState,
@@ -475,7 +516,31 @@ pub fn compute_prevent_strength(
     order_status: &HashMap<String, bool>,
     src: &str,
 ) -> Bounds {
-    compute_defend_strength(map, state, orders, order_status, src)
+    let mut bounds = compute_defend_strength(map, state, orders, order_status, src);
+    
+    let (dest_prov, dest_coast) = &orders[src]
+        .downcast_ref::<Move>()
+        .expect("compute_defend_strength computed without move order")
+        .dest;
+
+    match is_head_to_head(map, state, orders, order_status, src) {
+        Some(false) => {},
+        None => {
+            if order_status.get(dest_prov).map(|x: &bool| *x) != Some(false) {
+                bounds.min = 0;
+            }
+        },
+        Some(true) => {
+            if order_status.get(dest_prov).map(|x| *x) != Some(false) {
+                bounds.min = 0;
+            }
+            if order_status.get(dest_prov).map(|x| *x) == Some(true) {
+                bounds.max = 0;
+            }
+        }
+    }
+
+    bounds
 }
 
 /// Compute the [attack strength](https://webdiplomacy.net/doc/DATC_v3_0.html#5.B.8) of the given move order.
@@ -647,11 +712,13 @@ pub fn is_direct_path(map: &Map, state: &MapState, orders: &Orders, src: &str) -
 fn is_path_along(map: &Map, src: &str, dest: &str, convoys: &[String]) -> bool {
     let mut visited = HashSet::new();
     let mut stack = vec![src.to_string()];
+//    println!("-- convoy {} --", src);
     loop {
         let node = match stack.pop() {
             Some(n) => n,
             None => return false,
         };
+//        println!("node {}, {}",  &node, visited.len());
 
         if map.fleet_adj.contains(&(
             (node.to_string(), "".to_string()),

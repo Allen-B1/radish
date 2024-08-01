@@ -31,7 +31,7 @@ let data = `
 			<ADJACENCY type="xc" refs="lvn pru ber kie den swe bot" />
 		</PROVINCE>
 		<PROVINCE shortname="bar" fullname="Barents Sea">
-			<ADJACENCY type="xc" refs="nwg stp-nc nor" />
+			<ADJACENCY type="xc" refs="nwg stp-nc nwy" />
 		</PROVINCE>
 		<PROVINCE shortname="bel" fullname="Belgium">
 			<ADJACENCY type="mv" refs="hol pic ruh bur" />
@@ -95,7 +95,7 @@ let data = `
 			<ADJACENCY type="xc" refs="mao iri wal lon nth bel pic bre" />
 		</PROVINCE>
 		<PROVINCE shortname="fin" fullname="Finland">
-			<ADJACENCY type="mv" refs="swe stp nor" />
+			<ADJACENCY type="mv" refs="swe stp nwy" />
 			<ADJACENCY type="xc" refs="swe stp-sc bot" />
 		</PROVINCE>
 		<PROVINCE shortname="gal" fullname="Galicia">
@@ -197,10 +197,10 @@ let data = `
 			<UNIQUENAME name="northsea" />
 			<UNIQUENAME name="nts" />
 			<UNIQUENAME name="nrd" />
-			<ADJACENCY type="xc" refs="yor edi nwg nor ska den hel hol bel eng lon" />
+			<ADJACENCY type="xc" refs="yor edi nwg nwy ska den hel hol bel eng lon" />
 		</PROVINCE>
 		<PROVINCE shortname="nwy" fullname="Norway">
-			<UNIQUENAME name="nor" />
+			<UNIQUENAME name="nwy" />
 			<UNIQUENAME name="nge" />
 			<ADJACENCY type="mv" refs="fin stp swe" />
 			<ADJACENCY type="xc" refs="ska nth nwg bar stp-nc swe" />
@@ -210,7 +210,7 @@ let data = `
 			<UNIQUENAME name="norwsea" />
 			<UNIQUENAME name="nrg" />
 			<UNIQUENAME name="gro" />
-			<ADJACENCY type="xc" refs="nao bar nor nth cly edi" />
+			<ADJACENCY type="xc" refs="nao bar nwy nth cly edi" />
 		</PROVINCE>
 		<PROVINCE shortname="par" fullname="Paris">
 			<ADJACENCY type="mv" refs="bre pic bur gas" />
@@ -256,7 +256,7 @@ let data = `
 		</PROVINCE>
 		<PROVINCE shortname="ska" fullname="Skagerrak">
 			<UNIQUENAME name="skaggerak" />
-			<ADJACENCY type="xc" refs="nth nor den swe" />
+			<ADJACENCY type="xc" refs="nth nwy den swe" />
 		</PROVINCE>
 		<PROVINCE shortname="smy" fullname="Smyrna">
 			<ADJACENCY type="mv" refs="syr con ank arm" />
@@ -274,13 +274,13 @@ let data = `
 			<UNIQUENAME name="st petersberg" />
 			<UNIQUENAME name="st. petersberg" />
 			<UNIQUENAME name="stpetersberg" />
-			<ADJACENCY type="mv" refs="fin lvn nor mos" />
-			<ADJACENCY type="nc" refs="bar nor" />
+			<ADJACENCY type="mv" refs="fin lvn nwy mos" />
+			<ADJACENCY type="nc" refs="bar nwy" />
 			<ADJACENCY type="sc" refs="fin lvn bot" />
 		</PROVINCE>
 		<PROVINCE shortname="swe" fullname="Sweden">
-			<ADJACENCY type="mv" refs="fin den nor" />
-			<ADJACENCY type="xc" refs="fin bot bal den ska nor" />
+			<ADJACENCY type="mv" refs="fin den nwy" />
+			<ADJACENCY type="xc" refs="fin bot bal den ska nwy" />
 		</PROVINCE>
 		<PROVINCE shortname="syr" fullname="Syria">
 			<ADJACENCY type="mv" refs="smy arm" />

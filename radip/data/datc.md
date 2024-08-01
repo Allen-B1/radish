@@ -528,3 +528,208 @@ Italy:
 Russia:
 `A War S Lvn - Pru` T
 `A Lvn - Pru` F
+
+# 6.E.
+### 6.E.1.
+Germany:
+`A Ber - Pru` T
+`F Kie - Ber` T
+`A Sil S Ber - Pru` T
+
+Russia:
+`A Pru - Ber` F
+
+### 6.E.2.
+Germany:
+`A Ber - Kie` F
+`F Kie - Ber` F
+`A Mun S Ber - Kie` T
+
+### 6.E.3.
+Germany:
+`A Ber - Kie` F
+`A Mun S Kie - Ber` T
+
+England:
+`F Kie - Ber` F
+
+### 6.E.4.
+Germany:
+`F Hol - NTH` F
+`F HEL S Hol - NTH` T
+`F Ska S Hol - NTH` T
+
+France:
+`F NTH - Hol` F
+`F Bel S NTH - Hol` T
+
+England:
+`F Edi S NWG - NTH` T
+`F Yor S NWG - NTH` T
+`F NWG - NTH` F
+
+Austria:
+`A Kie S Ruh - Hol` T
+`A Ruh - Hol` F
+
+### 6.E.5.
+Germany:
+`F Hol - NTH` F
+`F HEL S Hol - NTH` T
+`F Ska S Hol - NTH` T
+
+France:
+`F NTH - Hol` F
+`F Bel S NTH - Hol` T
+
+England:
+`F Edi S NWG - NTH` T
+`F Yor S NWG - NTH` T
+`F NWG - NTH` T
+`F Lon S NWG - NTH` T
+
+Austria:
+`A Kie S Ruh - Hol` T
+`A Ruh - Hol` F
+
+### 6.E.6.
+Germany:
+`F Hol - NTH` F
+`F HEL S Hol - NTH` T
+
+France:
+`F NTH - Hol` F
+`F Bel S NTH - Hol` T
+`F ENG S Hol - NTH` T
+
+Austria:
+`A Kie S Ruh - Hol` T
+`A Ruh - Hol` F
+
+### 6.E.7.
+England:
+`F NTH H` T
+`F Yor S Nwy - NTH` T
+
+Germany:
+`F Hol S HEL - NTH` T
+`F HEL - NTH` F
+
+Russia:
+`F Ska S Nwy - NTH` T
+`F Nwy - NTH` F
+
+### 6.E.8.
+England:
+`F NTH - Nwy` F
+`F Yor S Nwy - NTH` T
+
+Germany:
+`F Hol S HEL - NTH` T
+`F HEL - NTH` F
+
+Russia:
+`F Ska S Nwy - NTH` T
+`F Nwy - NTH` F
+
+### 6.E.9.
+England:
+`F NTH - NWG` T
+`F Yor S Nwy - NTH` T
+
+Germany:
+`F Hol S HEL - NTH` T
+`F HEL - NTH` F
+
+Russia:
+`F Ska S Nwy - NTH` T
+`F Nwy - NTH` T
+
+### 6.E.10.
+England:
+`F NTH - Den` F
+`F Yor S Nwy - NTH` T
+
+Germany:
+`F Hol S HEL - NTH` T
+`F HEL - NTH` F
+`F Den - HEL` F
+
+Russia:
+`F Ska S Nwy - NTH` T
+`F Nwy - NTH` F
+
+
+### 6.E.11.
+France:
+`A Spa - Por` T
+`F MAO C Spa - Por` T
+`F LYO S Por - Spa` T
+
+Germany:
+`A Mar S Gas - Spa` T
+`A Gas - Spa` F
+
+Italy:
+`F Por - Spa(nc)` T
+`F WES S Por - Spa` T
+
+### 6.E.11a.
+France:
+`A Spa - Por` T
+`F Por - Spa(sc)` T
+`F MAO C Spa - Por` T
+
+### 6.E.12.
+Austria:
+`A Bud - Rum` F
+`A Ser S Vie - Bud` T
+
+Italy:
+`A Vie - Bud` F
+
+Russia:
+`A Gal - Bud` F
+`A Rum S Gal - Bud` T
+
+### 6.E.13.
+England:
+`F Edi S Yor - NTH` T
+`F Yor - NTH` F
+
+France:
+`F Bel - NTH` F
+`F ENG S Bel - NTH` T
+
+Germany:
+`F NTH H` T
+
+Russia:
+`F NWG - NTH` F
+`F Nwy S NWG - NTH` T
+
+### 6.E.14.
+England:
+`A Lvp - Edi` F
+
+Russia:
+`F Edi - Lvp` F
+
+### 6.E.15.
+England:
+`F Hol S Ruh - Kie` T
+`A Ruh - Kie` F
+
+France:
+`A Kie - Ber` F
+`A Mun S Kie - Ber` T
+`A Sil S Kie - Ber` T
+
+Germany:
+`A Ber - Kie` F
+`F Den S Ber - Kie` T 
+`F HEL S Ber - Kie` T
+
+Russia:
+`F BAL S Pru - Ber` T
+`A Pru - Ber` F

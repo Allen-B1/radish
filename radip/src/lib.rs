@@ -1,4 +1,4 @@
-//! Diplomacy adjucator, based on [Kruijswijk's specification](https://webdiplomacy.net/doc/DATC_v3_0.html).
+//! DATC-compliant\* diplomacy adjucator.
 //!
 //! Use [`adjudicate`] to adjudicate a movement phase, and [`utils::apply_adjudication`] to update the map.
 //! This crate does not support build phases, as those are fairly easy to implement on your own, and
@@ -107,6 +107,10 @@ impl Deref for dyn Order {
 pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<String, bool> {
     let mut order_status: HashMap<String, bool> = HashMap::new();
     loop {
+        if order_status.len() == orders.len() {
+            break;
+        }
+
         let num_resolved = order_status.len();
 
         for (prov, order) in orders.iter() {
@@ -129,10 +133,6 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
                 }
                 None => {}
             }
-        }
-
-        if order_status.len() == orders.len() {
-            break;
         }
 
         if order_status.len() != num_resolved {
