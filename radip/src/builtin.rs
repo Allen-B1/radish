@@ -137,6 +137,10 @@ impl Order for Move {
         orders: &crate::Orders,
         this_prov: &str,
     ) -> HashSet<String> {
+        if this_prov == self.dest.0 { // check is required for convoys!!
+            return HashSet::new();
+        }
+
         let mut deps = HashSet::new();
         for (src2, order2) in orders {
             if let Some(sup) = order2.downcast_ref::<SupportMove>() {
@@ -190,6 +194,10 @@ impl Order for Move {
         this_prov: &str,
         order_status: &std::collections::HashMap<String, bool>,
     ) -> Option<bool> {
+        if this_prov == self.dest.0 { // check is required for convoys!!
+            return Some(false)
+        }
+
         let attack_strength = compute_attack_strength(map, state, orders, order_status, this_prov);
 
         let mut strengths: Vec<Bounds> = Vec::new();
@@ -399,6 +407,7 @@ impl Order for SupportMove {
         if !orders.contains_key(&self.src)
             || !Move::is_move_to(orders[&self.src].deref(), &self.dest)
             || !unit_can_reach(map, state, this_prov, &self.dest)
+            || self.src == self.dest
         {
             HashSet::new()
         } else {
@@ -419,6 +428,7 @@ impl Order for SupportMove {
         if !orders.contains_key(&self.src)
             || !Move::is_move_to(orders[&self.src].deref(), &self.dest)
             || !unit_can_reach(map, state, this_prov, &self.dest)
+            || self.src == self.dest
         {
             Some(false)
         } else {
@@ -441,6 +451,9 @@ impl Order for Convoy {
         orders: &crate::Orders,
         this_prov: &str,
     ) -> HashSet<String> {
+        if !map.provinces[this_prov].is_sea {
+            return HashSet::new()
+        }
         deps_for_hold(map, state, orders, this_prov)
     }
 
@@ -452,6 +465,9 @@ impl Order for Convoy {
         this_prov: &str,
         order_status: &std::collections::HashMap<String, bool>,
     ) -> Option<bool> {
+        if !map.provinces[this_prov].is_sea {
+            return Some(false)
+        }
         is_dislodged(map, state, orders, this_prov, order_status)
     }
 }
@@ -772,10 +788,6 @@ pub fn is_convoy_path(
     let mut possible_convoys = Vec::new();
     let mut definite_convoys = Vec::new();
     for (prov_it, order_it) in orders.iter() {
-        if !map.provinces[prov_it].is_sea {
-            continue;
-        }
-
         let convoy = match order_it.downcast_ref::<Convoy>() {
             Some(c) => c,
             None => continue,

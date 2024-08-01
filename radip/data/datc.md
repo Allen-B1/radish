@@ -10,7 +10,53 @@ England:
 
 ### 6.A.3.
 Germany:
-`F Kiel - Mun` F
+`F Kie - Mun` F
+
+### 6.A.4.
+Germany:
+`F Kie - Kie` F
+
+### 6.A.5.
+England:
+`F NTH C Yor - Yor` T
+`A Yor - Yor` F
+`A Lvp S Yor - Yor` F
+
+Germany:
+`F Lon - Yor` T
+`A Wal S Lon - Yor` T
+
+### 6.A.7.
+England:
+`F Lon - Bel` F
+`F NTH C Lon - Bel` T
+
+### 6.A.8.
+Italy:
+`A Ven - Tri` T
+`A Tyr S Ven - Tri` T
+
+Austria:
+`F Tri S Tri H` F
+
+### 6.A.9.
+Italy:
+`F Rom - Ven` F
+
+### 6.A.10.
+Austria:
+`A Ven H` T
+
+Italy:
+`F Rom S Apu - Ven` F
+`A Apu - Ven` T
+
+### 6.A.11.
+Austria:
+`A Vie - Tyr` F
+
+Italy:
+`A Ven - Tyr` F
 
 ### 6.A.12.
 Austria:
@@ -733,3 +779,504 @@ Germany:
 Russia:
 `F BAL S Pru - Ber` T
 `A Pru - Ber` F
+
+# 6.F.
+### 6.F.1.
+Turkey:
+`A Gre - Sev`  F
+`F AEG C Gre - Sev` T
+`F Con C Gre - Sev` F
+`F BLA C Gre - Sev` T
+
+### 6.F.2.
+England:
+`F ENG C Lon - Bre` T
+`A Lon - Bre` F
+
+France:
+`A Par - Bre` F
+
+### 6.F.3.
+England:
+`F ENG C Lon - Bre` T
+`A Lon - Bre` T
+`F MAO S Lon - Bre` T
+
+France:
+`A Par - Bre` F
+
+### 6.F.4.
+England:
+`F NTH C Lon - Hol` T
+`A Lon - Hol` T
+
+England:
+`F Ska - NTH` F
+
+### 6.F.5.
+England:
+`F NTH C Lon - Hol` T
+`A Lon - Hol` T
+
+France:
+`F ENG - NTH` F
+`F Bel S ENG - NTH` T
+
+Germany:
+`F Ska - NTH` F
+`F Den S Ska - NTH` T
+
+### 6.F.6.
+England:
+`F NTH C Lon - Hol` F
+`A Lon - Hol` F
+
+Germany:
+`A Hol S Bel H` T
+`A Bel S Hol H` F
+`F HEL S SKA - NTH` T
+`F SKA - NTH` T
+
+France:
+`A Pic - Bel` F
+`A Bur S Pic - Bel` T
+
+### 6.F.7.
+England:
+`F NTH C Lon - Hol` F
+`A Lon - Hol` F
+
+Germany:
+`F HEL S SKA - NTH` T
+`F SKA - NTH` T
+
+### 6.F.8.
+England:
+`F NTH C Lon - Hol` F
+`A Lon - Hol` F
+
+Germany:
+`F HEL S SKA - NTH` T
+`F SKA - NTH` T
+`A Bel - Hol` T
+
+### 6.F.9.
+England:
+`F ENG C Lon - Bel` F
+`F NTH C Lon - Bel` T
+`A Lon - Bel` T
+
+France:
+`F Bre S MAO - ENG` T
+`F MAO - ENG` T
+
+### 6.F.10.
+England:
+`F NTH C Lon - Bel` T
+`A Lon - Bel` T
+
+Germany:
+`F ENG C Lon - Bel` F
+
+France:
+`F Bre S MAO - ENG` T
+`F MAO - ENG` T
+
+### 6.F.11.
+England:
+`A Lon - Bel` T
+
+Germany:
+`F ENG C Lon - Bel` F
+
+Russia:
+`F NTH C Lon - Bel` T
+
+France:
+`F Bre S MAO - ENG` T
+`F MAO - ENG` T
+
+### 6.F.12.
+England:
+`F ENG C Lon - Bel` T
+`A Lon - Bel` T
+`F IRI C Lon - Bel` F
+
+France:
+`F NAO S MAO - IRI` T
+`F MAO - IRI` T
+
+### 6.F.13.
+England:
+`A Lon - Bel` T
+`F NTH C Lon - Bel` F
+
+France:
+`F ENG C Lon - Bel` T
+
+Germany:
+`F Hol S Den - NTH` T
+`F Den - NTH` T
+
+### 6.F.14.
+England:
+`F Lon S Wal - ENG` T
+`F Wal - ENG` T
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+
+### 6.F.15.
+England:
+`F Lon S Wal - ENG` T
+`F Wal - ENG` T
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+
+Italy:
+`F IRI C Naf - Wal` T
+`F MAO C Naf - Wal` T
+`A Naf - Wal` T
+
+### 6.F.16.
+England:
+`F Lon S Wal - ENG` T
+`F Wal - ENG` F
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+
+Germany:
+`F NTH S Bel - ENG` T
+`F Bel - ENG` F
+
+### 6.F.17.
+England:
+`F Lon S Wal - ENG` T
+`F Wal - ENG` F
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+`F Yor S Bre - Lon` T
+
+Germany:
+`F NTH S Bel - ENG` T
+`F Bel - ENG` F
+
+### 6.F.18.
+England:
+`F NTH C Lon - Bel` F
+`A Lon - Bel` F
+`F ENG S Lon - Bel` T
+
+France:
+`F Bel S NTH H` T
+
+Germany:
+`F HEL S SKA - NTH` T
+`F SKA - NTH` F
+
+### 6.F.19.
+France:
+`A Tun - Nap` F
+`F TYS C Tun - Nap` T
+`F ION C Tun - Nap` T
+
+Italy:
+`F Nap S Rom - TYS` F
+`F Rom - TYS` F
+
+### 6.F.20.
+France:
+`A Tun - Nap` F
+`F TYS C Tun - Nap` T
+
+Italy:
+`F Nap S ION H` F
+`F ION C Tun - Nap` F
+
+Turkey:
+`F AEG S EAS - ION` T
+`F EAS - ION` T
+
+### 6.F.21.
+Russia:
+`A Edi S Nwy - Cly` T
+`F NWG C Nwy - Cly` T
+`A Nwy - Cly` T
+
+France:
+`F IRI S MAO - NAO` T
+`F MAO - NAO` T
+
+England:
+`A Lvp - Cly` F
+`F NAO C Lvp - Cly` F
+`F Cly S NAO H` F
+
+### 6.F.22.
+England:
+`F Edi - NTH` T
+`F Lon S Edi - NTH` T
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+
+Germany:
+`F Bel S Pic - ENG` T
+`F Pic - ENG` T
+
+Russia:
+`A Nwy - Bel` F
+`F NTH C Nwy - Bel` F
+
+### 6.F.23.
+England:
+`F Edi - NTH` F
+`F Yor S Edi - NTH` T
+
+France:
+`A Bre - Lon` F
+`F ENG C Bre - Lon` F
+
+Germany:
+`F Bel S ENG H` T
+`F Lon S NTH H` T
+
+Italy:
+`F MAO - ENG` F
+`F IRI S MAO - ENG` T
+
+Russia:
+`A Nwy - Bel` F
+`F NTH C Nwy - Bel` F
+
+# 6.G.
+### 6.G.1.
+England:
+`A Nwy - Swe` T
+`F SKA C Nwy - Swe` T
+
+Russia:
+`A Swe - Nwy` T
+
+### 6.G.2.
+> Convoy kidnapping
+England:
+`A Nwy - Swe` T
+
+Russia:
+`F Swe - Nwy` T
+
+Germany:
+`F SKA C Nwy - Swe` T
+
+### 6.G.3.
+France:
+`F Bre - ENG` T
+`A Pic - Bel` T
+`A Bur S Pic - Bel` T 
+`F MAO S Bre - ENG` T
+
+England:
+`F ENG C Pic - Bel` F
+
+### 6.G.4.
+France:
+`F Bre - ENG` T
+`A Pic - Bel` T
+`A Bur S Pic - Bel` T
+`F MAO S Bre - ENG` T
+
+England:
+`F ENG C Pic - Bel` F
+`A Bel - Pic` F
+
+### 6.G.5.
+Italy:
+`A Rom - Apu` T
+`F TYS C Apu - Rom` T
+
+Turkey:
+`A Apu - Rom` T
+`F ION C Apu - Rom` T
+
+### 6.G.6.
+England:
+`A Lvp - Edi` T
+`F ENG C Lvp - Edi` T
+
+Germany:
+`A Edi - Lvp` T
+
+France:
+`F IRI H` T
+`F NTH H` T
+
+Russia:
+`F NWG C Lvp - Edi` T
+`F NAO C Lvp - Edi` T
+
+### 6.G.7.
+England:
+`F SKA C Swe - Nwy` T
+`F Nwy - Swe` T
+
+Russia:
+`A Swe - Nwy` T
+`F BOT C Swe - Nwy` T
+
+### 6.G.8.
+France:
+`A Bel - Hol` T
+
+England:
+`F NTH - HEL` T
+`A Hol - Kie` T
+
+### 6.G.9.
+England:
+`A Nwy - Swe` T
+`F SKA C Nwy - Swe` T
+`F Fin S Nwy - Swe` T
+
+Russia:
+`A Swe - Nwy` T
+
+### 6.G.10.
+England:
+`A Nwy - Swe` T
+`F Den S Nwy - Swe` T
+`F Fin S Nwy - Swe` T
+
+Germany:
+`F SKA C Nwy - Swe` T
+
+Russia:
+`A Swe - Nwy` F
+`F BAR S Swe - Nwy` T
+
+France:
+`F NWG - Nwy` F
+`F NTH S NWG - Nwy` T
+
+### 6.G.11.
+England:
+`F Nwy S NTH - SKA` F
+`F NTH - SKA` F
+
+Russia:
+`A Swe - Nwy` T
+`F SKA C Swe - Nwy` T 
+`F BAR S Swe - Nwy` T
+
+### 6.G.12.
+England:
+`A Lvp - Edi` T
+`F NAO C Lvp - Edi` T
+`F NWG C Lvp - Edi` T
+
+Germany:
+`A Edi - Lvp` T
+`F NTH C Edi - Lvp` T
+`F ENG C Edi - Lvp` T
+`F IRI C Edi - Lvp` T
+
+### 6.G.13.
+Austria:
+`F ADR C Tri - Ven` T
+`A Tri - Ven` F
+
+Italy:
+`A Ven S Alb - Tri` T
+`F Alb - Tri` T
+
+### 6.G.14.
+England:
+`A Nwy - Swe` T
+`F Den S Nwy - Swe` T
+`F Fin S Nwy - Swe` T
+
+France:
+`F NWG - Nwy` F
+`F NTH S NWG - Nwy` T
+
+Germany:
+`F SKA C Swe - Nwy` T
+
+Russia:
+`A Swe - Nwy` F
+`F BAR S Swe - Nwy` T
+
+### 6.G.15.
+England:
+`F NTH C Lon - Bel` T
+`A Hol S Lon - Bel` T
+`A Yor - Lon` F
+`A Lon - Bel` T
+
+France:
+`F ENG C Bel - Lon` T
+`A Bel - Lon` F
+
+### 6.G.16.
+England:
+`A Nwy - Swe` T
+`A Den S Nwy - Swe` T
+`F BAL S Nwy - Swe` T
+`F NTH - Nwy` F
+
+Russia:
+`A Swe - Nwy` T
+`F SKA C Swe - Nwy` T
+`F NWG S Swe - Nwy` T
+
+### 6.G.17.
+England:
+`A Nwy - Swe` T
+`A Den S Nwy - Swe` T
+`F BAL S Nwy - Swe` T
+`F SKA C Nwy - Swe` T
+`F NTH - Nwy` F
+
+Russia:
+`A Swe - Nwy` T
+`F NWG S Swe - Nwy` T
+
+### 6.G.18.
+England:
+`F NTH C Lon - Bel` T
+`F Hol S Lon - Bel` T
+`A Yor - Lon` F
+`A Lon - Bel` T
+`A Ruh S Lon - Bel` T
+
+France:
+`F ENG C Bel - Lon` T
+`A Bel - Lon` T
+`A Wal S Bel - Lon` T
+
+### 6.G.19.
+France:
+`A Mar - Spa` T
+`F WES C Mar - Spa` T
+
+Italy:
+`F LYO C Mar - Spa` T
+`A Spa - Mar` T
+
+### 6.G.20.
+France:
+`F Bre - ENG` T
+`A Pic - Bel` T
+`A Bur S Pic - Bel` T
+`F MAO S Bre - ENG` T
+
+England:
+`F ENG C Pic - Bel` F
