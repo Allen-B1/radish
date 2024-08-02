@@ -4,7 +4,7 @@ use std::{
     hash::Hash,
 };
 
-use crate::{adjudicate, builtin, Map, MapState, Orders, Unit};
+use crate::{adjudicate, base, Map, MapState, Orders, Unit};
 
 #[derive(Debug)]
 struct Test {
@@ -36,8 +36,7 @@ fn parse_province(src: &str) -> (String, String) {
 
 #[test]
 fn datc() -> Result<(), Box<dyn Error>> {
-    let stdvar = include_str!("../data/std.json");
-    let map: Map = serde_json::from_str(stdvar)?;
+    let map = Map::classic();
     let datc = include_str!("../data/datc.md");
 
     let mut tests = vec![];
@@ -89,7 +88,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
                     let (dest_prov, dest_coast) = parse_province(parts[3]);
                     active_test.orders.insert(
                         prov.to_string(),
-                        Box::new(builtin::Move {
+                        Box::new(base::Move {
                             dest: (dest_prov.to_string(), dest_coast.to_string()),
                         }),
                     );
@@ -100,7 +99,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
                         let (dest_prov, dest_coast) = parse_province(parts[5]);
                         active_test.orders.insert(
                             prov.to_string(),
-                            Box::new(builtin::SupportMove {
+                            Box::new(base::SupportMove {
                                 src: src_prov.to_string(),
                                 dest: dest_prov.to_string(),
                             }),
@@ -109,7 +108,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
                         let (dest_prov, dest_coast) = parse_province(parts[3]);
                         active_test.orders.insert(
                             prov.to_string(),
-                            Box::new(builtin::SupportHold {
+                            Box::new(base::SupportHold {
                                 target: dest_prov.to_string(),
                             }),
                         );
@@ -120,7 +119,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
                 "H" => {
                     active_test
                         .orders
-                        .insert(prov.to_string(), Box::new(builtin::Hold));
+                        .insert(prov.to_string(), Box::new(base::Hold));
                 }
                 "C" => {
                     assert!(parts[4] == "-");
@@ -128,7 +127,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
                     let (dest_prov, dest_coast) = parse_province(parts[5]);
                     active_test.orders.insert(
                         prov.to_string(),
-                        Box::new(builtin::Convoy {
+                        Box::new(base::Convoy {
                             src: src_prov.to_string(),
                             dest: dest_prov.to_string(),
                         }),

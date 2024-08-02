@@ -1,7 +1,7 @@
 
 use std::{hash::Hash, thread::current};
 
-use builtin::{compute_attack_strength, compute_defend_strength, compute_prevent_strength, is_path, Convoy, Move};
+use base::{compute_attack_strength, compute_defend_strength, compute_prevent_strength, is_path, Convoy, Move};
 use frozenset::{Freeze, FrozenSet};
 
 use crate::*;

@@ -6,22 +6,29 @@
 
 use std::{
     any::Any,
-    clone,
     collections::{HashMap, HashSet},
     fmt::Debug,
     ops::Deref,
 };
-pub mod builtin;
+
+pub mod base;
+pub mod core;
+
 mod test;
 mod paradox;
 
+/// Abbreviation for a province (e.g. NTH, Lvn).
 pub type ProvinceAbbr = String;
 
+/// A fleet location. The first element of the tuple is the province, the second is the coast.
 pub type FleetLoc = (ProvinceAbbr, String);
+
+/// An army location.
 pub type ArmyLoc = ProvinceAbbr;
 
 use serde::{Deserialize, Serialize};
 
+/// Province metadata stored in a [`Map`].
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Province {
     pub name: String,
@@ -29,6 +36,7 @@ pub struct Province {
     pub is_sea: bool,
 }
 
+/// A variant map.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Map {
     pub provinces: HashMap<ProvinceAbbr, Province>,
@@ -36,6 +44,16 @@ pub struct Map {
     pub army_adj: HashSet<(ArmyLoc, ArmyLoc)>,
 }
 
+impl Map {
+    /// The classic map.
+    pub fn classic() -> Self {
+        let default = include_str!("../data/classic.json");
+
+        serde_json::from_str(default).unwrap()
+    }
+}
+
+/// Stores the units present on a diplomacy board.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapState {
     pub units: HashMap<String, Unit>,
@@ -61,6 +79,7 @@ impl Unit {
 /// an associated order.
 pub type Orders = HashMap<String, Box<dyn Order>>;
 
+/// Helper trait.
 pub trait AsAny {
     fn as_any(&self) -> &dyn Any;
 }
@@ -74,6 +93,7 @@ impl<T: Any> AsAny for T {
 /// Represents an order object.
 ///
 /// Downcasting is supported via [`Any::downcast_ref`](std::any::Any::downcast_ref) and [`Any::is`](std::any::Any::is).
+#[typetag::serde(tag = "type")]
 pub trait Order: 'static + Debug + AsAny {
     /// Return orders (identified by source province) that this order depends on
     /// for resolution.
