@@ -269,6 +269,13 @@ impl Order for Move {
     }
 }
 
+/// A support hold order.
+/// The coast is not specified; only the province.
+/// 
+/// A support hold order succeeds iff
+/// * the supporting unit is adjacent to the target,
+/// * the target does not move, and
+/// * the supporting unit is not tapped.
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct SupportHold {
     pub target: ProvinceAbbr,
@@ -372,6 +379,13 @@ impl Order for SupportHold {
     }
 }
 
+/// A support move order.
+/// The coast of both the source and destination is not specified; only the province.
+/// 
+/// A support move order succeeds iff
+/// * the supporting unit is adjacent to the destination,
+/// * the source moves to the destination, and
+/// * the supporting unit is not tapped by a unit other than the destination.
 #[derive(PartialEq, Clone, Serialize, Deserialize, Debug)]
 pub struct SupportMove {
     pub src: ProvinceAbbr,
