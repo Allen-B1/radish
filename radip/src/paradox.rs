@@ -1,10 +1,16 @@
 
 use std::{hash::Hash, thread::current};
 
-use builtin::{compute_attack_strength, compute_defend_strength, compute_prevent_strength, is_path, Move};
+use builtin::{compute_attack_strength, compute_defend_strength, compute_prevent_strength, is_path, Convoy, Move};
+use frozenset::{Freeze, FrozenSet};
 
 use crate::*;
 
+/// Compute the cycle starting at the given province.
+/// A cycle is a circular sequence of moves
+/// for which each move has greater attack strength
+/// than the prevent strength of all other units
+/// moving to the same province.
 fn get_cycle_at(map: &Map, state: &MapState, orders: &Orders, order_status: &mut HashMap<String, bool>, start: &str) -> Option<HashSet<String>> {
     let mut cycle = HashSet::new();
 
@@ -56,6 +62,8 @@ fn get_cycle_at(map: &Map, state: &MapState, orders: &Orders, order_status: &mut
     Some(cycle)
 }
 
+/// Resolve all move orders in
+/// a cycle with success.
 pub fn handle_cycles(map: &Map, state: &MapState, orders: &Orders, order_status: &mut HashMap<String, bool>) {
     loop {
         let num_resolved = order_status.len();
@@ -78,6 +86,66 @@ pub fn handle_cycles(map: &Map, state: &MapState, orders: &Orders, order_status:
 
         if num_resolved == order_status.len() {
             break
+        }
+    }
+}
+
+fn get_component(map: &Map, state: &MapState, orders: &Orders, order_status: &mut HashMap<String, bool>, start: &str) -> FrozenSet<String> {
+    let mut component = HashSet::new();
+    let mut visited = HashSet::new();
+    let mut stack = vec![start.to_string()];
+
+    loop {
+        let node = match stack.pop() {
+            Some(node) => node,
+            None => break
+        };
+
+        if !orders.contains_key(&node) {
+            continue
+        }
+
+        for dep in orders[&node].deps(map, state, orders, &node) {
+            if !visited.contains(&dep) {
+                stack.push(dep);
+            }
+        }
+
+        if orders[&node].is::<Convoy>() {
+            component.insert(node.to_string());
+        }
+
+        visited.insert(node);
+    }
+    
+    component.freeze()
+}
+
+/// Compute the component of unresolved moves
+/// with the minimum number of convoy orders,
+/// and set all convoy orders in that component to fail.
+/// 
+/// If there are multiple components with the same
+/// minimal number of convoy moves, all convoy orders
+/// in all such components fail.
+pub fn handle_convoy(map: &Map, state: &MapState, orders: &Orders, order_status: &mut HashMap<String, bool>) {
+    let mut components: HashSet<FrozenSet<String>> = HashSet::new();
+    for (prov_it, order_it) in orders.iter() {
+        if order_it.is::<Convoy>() && order_status.get(prov_it) == None {
+            components.insert(get_component(map, state, orders, order_status, prov_it));
+        }
+    }
+
+    let min = match components.iter().map(|x| x.len()).min() {
+        None => return,
+        Some(min) => min
+    };
+
+    for component in components {
+        if component.len() == min {
+            for convoy_prov in component {
+                order_status.insert(convoy_prov, false);
+            }
         }
     }
 }

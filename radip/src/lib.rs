@@ -141,9 +141,14 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
             continue;
         }
 
-        // cycles & paradoxes
+        // paradoxes
+    
         paradox::handle_cycles(map, state, orders, &mut order_status);
+        if order_status.len() != num_resolved {
+            continue;
+        }
 
+        paradox::handle_convoy(map, state, orders, &mut order_status);
         if order_status.len() != num_resolved {
             continue;
         }
