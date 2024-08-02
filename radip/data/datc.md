@@ -49,7 +49,7 @@ Austria:
 
 Italy:
 `F Rom S Apu - Ven` F
-`A Apu - Ven` T
+`A Apu - Ven` F
 
 ### 6.A.11.
 Austria:

@@ -13,6 +13,7 @@ use std::{
 };
 pub mod builtin;
 mod test;
+mod paradox;
 
 pub type ProvinceAbbr = String;
 
@@ -141,7 +142,12 @@ pub fn adjudicate(map: &Map, state: &MapState, orders: &Orders) -> HashMap<Strin
         }
 
         // cycles & paradoxes
-        //        panic!("cycle or paradox")
+        paradox::handle_cycles(map, state, orders, &mut order_status);
+
+        if order_status.len() != num_resolved {
+            continue;
+        }
+
         break;
     }
 
