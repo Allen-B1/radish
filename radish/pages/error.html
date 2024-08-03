@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Error | Radish</title>
+        {:include HeadComponent}
+    </head>
+    <body>
+        {:include HeaderComponent { user_name: self.user_name.to_string() } }
+
+        <main>
+            <h1>Error{:if self.msg != ""}: {self.msg}{:end}</h1>
+            {:if self.details != ""}
+                <p>Details:</p>
+                <pre>{self.details}</pre>
+            {:end}
+        </main>
+    </body>
+</html>
