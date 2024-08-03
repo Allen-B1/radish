@@ -1,27 +1,54 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <title>Upload Variant | Radish</title>
+        <title>New Variant | Radish</title>
         {:include HeadComponent}
+        <!--{#-->
+        <style>
+            p > label { white-space: nowrap;
+                margin-right: 16px;
+            }
+        </style>
+        <!--}-->
     </head>
     <body>
         {:include HeaderComponent { user_name : self.user_name.to_string() }}
         <main>
-            <h3>Upload Variant</h3>
-            <p>
-                Upload the following files:
-            </p>
-            <ol>
-                <li>An Inkscape <code>.svg</code> file with the following format:</li>
-                <ol type="a">
-                    <li>The <code>id</code> of each land tile is set to the province abbreviation</li>
-                    <li>The <code>id</code> of each supply center marker is set to <code>sc-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
-                    <li>For each province there is an object with id <code>unit-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
-                    <li>For each coast there is an object with id <code>unit-Abbr-xc</code> where <code>Abbr</code> is the province abbreviation
-                        and <code>xc</code> is the coast name</li>
-                </ol>
-                <li>A province adjacency <code>.json</code> file.</li>
-            </ol>
+            <h1>New Variant: Part 1</h1>
+            <div class="panel-2">
+                <form class="block" style="width:512px;height:100%" action="/variant/new/files" method="POST" enctype="multipart/form-data">
+                    <p style="display:flex">
+                        <label style="flex-grow: 1" for="svg">Map File</label>
+                        <input id="svg" name="svg" type="file" required accept="image/svg+xml">
+                    </p>
+                    <p style="display:flex">
+                        <label style="flex-grow: 1" for="adj">Adjacency Data</label>
+                        <input id="adj" name="adj" type="file" required accept="application/json">
+                    </p>
+                    <p style="display:flex">
+                        <label style="flex-grow: 1" for="meta">Metadata File</label>
+                        <input id="meta" name="meta" type="file" accept="application/json">
+                    </p>
+                    <p style="text-align:center">
+                        <button class="accent">Submit</button>
+                    </p>
+                </form>
+                <div style="flex-grow:1;padding:16px;padding-top:0">
+                    <h3>What to Upload</h3>
+                    <ol>
+                        <li>A map in <code>.svg</code> format with the following features:</li>
+                        <ol type="a">
+                            <li>The <code>id</code> of each land tile is set to the province abbreviation</li>
+                            <li>The <code>id</code> of each supply center marker is set to <code>sc-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
+                            <li>For each province there is an object with id <code>unit-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
+                            <li>For each coast there is an object with id <code>unit-Abbr-xc</code> where <code>Abbr</code> is the province abbreviation
+                                and <code>xc</code> is the coast name</li>
+                        </ol>
+                        <li>A province adjacency <code>.json</code> file.</li>
+                        <li>(Optional) A metadata <code>.json</code> file. If not included, the information will be filled out on the next page.</li>
+                    </ol>
+                </div>
+            </div>
         </main>
     </body>
 </html>

@@ -1,21 +1,38 @@
-use std::collections::HashMap;
+use core::str;
+use std::{collections::{HashMap, HashSet}, error::Error, fmt::Debug};
 
+use base64::{prelude::BASE64_STANDARD, Engine};
 use dashmap::DashMap;
 use google_auth_verifier::auth::{AuthVerifierClient, AuthenticationError};
-use rocket::{fs::FileServer, http::{Cookie, CookieJar}, response::{content::RawHtml, Redirect, Responder}, State};
+mod new_variant;
+use radip::{utils::{MapMeta, PowerMeta, ProvinceMeta}, Map, MapState, ProvinceAbbr, Unit};
+use rocket::{form::Form, fs::{FileServer, TempFile}, http::{Cookie, CookieJar}, response::{content::RawHtml, Redirect, Responder}, tokio::io::AsyncReadExt, State};
 
 struct AppState {
     pub users: DashMap<String, UserMeta>,
+    pub temp_variants: DashMap<String, TempVariant>,
+    pub variants: DashMap<String, Variant>,
+}
+
+struct TempVariant {
+    pub name: String,
+
+    pub powers: HashMap<String, PowerMeta>,
+    pub starting_state: MapState,
+    pub provinces: HashMap<ProvinceAbbr, ProvinceMeta>,
+
+    pub adj: Map,
+    pub svg: String,
+}
+
+struct Variant {
+    pub adj: Map,
+    pub svg: String,
+    pub meta: MapMeta,
 }
 
 struct UserMeta {
     pub name: String,
-}
-
-struct MapInfo {
-    map: radip::Map,
-    meta: radip::utils::MapMeta,
-    svg: String,
 }
 
 #[macro_use] extern crate rocket;
@@ -29,9 +46,9 @@ struct HeaderComponent {
 }
 
 #[get("/auth/<cred>")]
-async fn auth(cred: String, cookies: &CookieJar<'_>, app_state: &State<AppState>) -> Redirect {
+async fn auth(cred: &str, cookies: &CookieJar<'_>, app_state: &State<AppState>) -> Redirect {
     let mut verifier = AuthVerifierClient::new(None);
-    let resp = verifier.verify_oauth_token(&cred).await.map_err(|e| format!("{:?}", e))
+    let resp = verifier.verify_oauth_token(cred).await.map_err(|e| format!("{:?}", e))
         .and_then(|info| info.claims.get("sub")
             .and_then(|v| v.as_str().map(ToOwned::to_owned))
             .map(|sub| (info, sub))
@@ -79,34 +96,39 @@ pub struct HomePage {
 }
 
 #[get("/")]
-fn home(cookies: &CookieJar<'_>, state: &State<AppState>) -> Result<RawHtml<String>, Redirect> {
+fn home(cookies: &CookieJar<'_>, state: &State<AppState>) -> RawHtml<String> {
     let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
-    match state.users.get(token) {
-        None => Err(Redirect::to("/signin")),  
-        Some(user) => {
-            Ok(RawHtml(HomePage {
-                user_name: user.name.clone()
-            }.render_string().unwrap()))
-        } 
-    }
+    let name = state.users.get(token).map(|u| u.name.to_string()).unwrap_or("".to_string());
+
+    RawHtml(HomePage {
+        user_name: name
+    }.render_string().unwrap())
 }
 
-#[litem::template("pages/new_variant.html")]
-struct NewVariantPage {
+
+fn encode_error<T: Debug>(e: T) -> String {
+    let d = format!("{:?}", e);
+    BASE64_STANDARD.encode(d.as_bytes()).replace("=", "%3D")
+}
+
+#[litem::template("pages/error.html")]
+struct ErrorPage<'a> {
     user_name: String,
+    msg: &'a str,
+    details: &'a str
 }
 
-#[get("/variant/new")]
-fn new_variant(cookies: &CookieJar<'_>, state: &State<AppState>) -> Result<RawHtml<String>, Redirect>  {
+#[get("/error?<msg>&<details>")]
+fn error_page(cookies: &CookieJar<'_>, state: &State<AppState>, msg: &str, details: Option<&str>) -> RawHtml<String> {
     let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
-    match state.users.get(token) {
-        None => Err(Redirect::to("/signin")),  
-        Some(user) => {
-            Ok(RawHtml(NewVariantPage {
-                user_name: user.name.clone()
-            }.render_string().unwrap()))
-        } 
-    }
+    let name = state.users.get(token).map(|u| u.name.to_string()).unwrap_or("".to_string());
+
+    RawHtml(ErrorPage {
+        user_name: name,
+        msg: msg,
+        details: str::from_utf8(&BASE64_STANDARD.decode(details.unwrap_or("")).unwrap_or(vec![]))
+            .unwrap_or("")
+    }.render_string().unwrap())
 }
 
 #[launch]
@@ -116,10 +138,18 @@ fn rocket() -> _ {
         signin,
         auth,
         home,
-        new_variant
+        error_page,
+
+        new_variant::submit_variant,
+        new_variant::new_variant,
+        new_variant::new_variant_2,
+        new_variant::new_variant_files,
+        new_variant::variant_meta,
     ])
-    .mount("/static", FileServer::from("./static"))
+    .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {
-            users: DashMap::new()
+            users: DashMap::new(),
+            temp_variants: DashMap::new(),
+            variants: DashMap::new()
         })
 } 
