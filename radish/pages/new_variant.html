@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Upload Variant | Radish</title>
+        {:include HeadComponent}
+    </head>
+    <body>
+        {:include HeaderComponent { user_name : self.user_name.to_string() }}
+        <main>
+            <h3>Upload Variant</h3>
+            <p>
+                Upload the following files:
+            </p>
+            <ol>
+                <li>An Inkscape <code>.svg</code> file with the following format:</li>
+                <ol type="a">
+                    <li>The <code>id</code> of each land tile is set to the province abbreviation</li>
+                    <li>The <code>id</code> of each supply center marker is set to <code>sc-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
+                    <li>For each province there is an object with id <code>unit-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
+                    <li>For each coast there is an object with id <code>unit-Abbr-xc</code> where <code>Abbr</code> is the province abbreviation
+                        and <code>xc</code> is the coast name</li>
+                </ol>
+                <li>A province adjacency <code>.json</code> file.</li>
+            </ol>
+        </main>
+    </body>
+</html>

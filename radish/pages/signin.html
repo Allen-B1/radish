@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Sign in | Radish</title>
+        {:include HeadComponent}
+        <script src="https://accounts.google.com/gsi/client" async></script>
+
+        <!-- {# -->
+        <script>
+            function callback(resp) {
+                location.href = "/auth/" + resp.credential;
+            }
+        </script>
+
+        <!-- } -->
+    </head>
+    <body>
+        {:include HeaderComponent { user_name: self.user_name.to_string() } }
+        <main style="margin:auto; max-width: 256px; padding-top: 64px;text-align: center;">
+            <div id="g_id_onload"
+                data-client_id="289760555651-saa16e9ruel8sfei512j9c7fh4vi384c.apps.googleusercontent.com"
+                data-context="signin"
+                data-ux_mode="popup"
+                data-callback="callback"
+                data-auto_prompt="false">
+            </div>
+
+            <div class="g_id_signin"
+                data-type="standard"
+                data-shape="rectangular"
+                data-theme="outline"
+                data-text="signin_with"
+                data-size="large"
+                data-logo_alignment="left">
+            </div>
+        </main>
+    </body>
+</html>

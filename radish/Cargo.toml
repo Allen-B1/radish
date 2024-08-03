@@ -1,0 +1,13 @@
+[package]
+name = "radish"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+rocket = "0.5"
+radip = { path = "../radip" }
+google_auth_verifier = "0.1.4"
+dashmap = "6.0"
+litem = { git = "https://github.com/Allen-B1/litem.git" }

@@ -1,0 +1,62 @@
+body {
+    font-family: 'Roboto', sans-serif;
+    font-size: 16px;
+    padding: 0; margin: 0;
+    background: hsl(200, 10%, 10%);
+    color: #fff;
+}
+
+h3 { 
+    margin: 0;
+    margin-bottom: 8px;
+    font-size: 24px;
+}
+
+header {
+    background: hsl(330, 50%, 45%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    padding: 8px 16px;
+}
+
+header h2 { 
+    margin: 4px 0;
+    flex-grow: 1;
+    font-size: 22px;
+}
+header  a, header a:visited, header a:active {
+    color: #fff;
+    text-decoration: none;
+}
+
+header > *:not(:last-child) {
+    margin-right: 16px;
+}
+
+main { 
+    padding: 16px;
+    max-width: 1024px;
+    margin: auto;
+    margin-top: 16px;
+}
+
+h1 {
+    font-size: 128px;
+    text-align: center;
+}
+
+.button, button {
+    background: hsl(100, 45%, 45%);
+    color: #fff;
+    text-decoration: none !important;
+    cursor: pointer;
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.button:active, button:active {
+    background: hsl(100, 45%, 40%);
+}

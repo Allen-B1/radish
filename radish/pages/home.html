@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Home | Radish</title>
+        {:include HeadComponent}
+    </head>
+    <body>
+        {:include HeaderComponent { user_name: self.user_name.to_string() } }
+
+        <main>
+            <h1>
+                Hello!
+            </h1>
+            <p>
+                <a class="button" href="/game/new">New Game</a>
+                <a class="button" href="/variant/new">Upload Variant</a>
+            </p>
+        </main>
+    </body>
+</html>

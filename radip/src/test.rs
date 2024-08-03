@@ -162,7 +162,7 @@ fn datc() -> Result<(), Box<dyn Error>> {
         let mut incomplete_test = false;
 
         println!("\x1b[0m\x1b[1mtest {}\x1b[0m", test.name);
-        let state = MapState { units: test.units };
+        let state = MapState { units: test.units, ownership: HashMap::new() };
         let results = adjudicate(&map, &state, &test.orders);
         for (prov, expected) in test.expected {
             if results.get(&prov).map(|x| *x) == Some(expected) {

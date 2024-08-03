@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "blitzdip",
+    "radish",
     "radip"
 ]

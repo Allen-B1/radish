@@ -1,0 +1,13 @@
+<header>
+    <h2><a href="/">Radish</a></h2>
+
+
+    <a href="/about">About</a>
+    <a href="/variants">Variants</a>
+
+    {:if self.user_name.is_empty()}
+        <a class="button" href="/signin">Sign in</a>
+    {:else}
+        <span>{self.user_name}</span>
+    {:end}
+</header>

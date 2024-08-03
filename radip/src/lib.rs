@@ -13,6 +13,7 @@ use std::{
 
 pub mod base;
 pub mod core;
+pub mod utils;
 
 mod test;
 mod paradox;
@@ -31,7 +32,6 @@ use serde::{Deserialize, Serialize};
 /// Province metadata stored in a [`Map`].
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Province {
-    pub name: String,
     pub coasts: HashSet<String>,
     pub is_sea: bool,
 }
@@ -57,6 +57,11 @@ impl Map {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MapState {
     pub units: HashMap<String, Unit>,
+
+    /// Tracks SC ownership.
+    /// This field is not used in the core adjudicator;
+    /// it is included for convenience.
+    pub ownership: HashMap<ProvinceAbbr, String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
