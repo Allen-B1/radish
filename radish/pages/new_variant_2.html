@@ -15,15 +15,11 @@
             .flex > label {
                 flex-grow: 1;
             }
+            img {
+                width: 100%;
+            }
         </style>
         <!--}-->
-
-        <script>
-            let svg = `{@ self.tempvar.svg }`;
-            // {#
-            document.getElementById("img").src = "data:image/svg+xml;base64," + btoa(svg);
-            // }
-        </script>
     </head>
     <body>
         {:include HeaderComponent { user_name : self.user_name.to_string() }}
@@ -32,17 +28,17 @@
             <form action="/variant/new/submit" method="POST">
                 <div class="flex">
                     <label for="name">Name</label>
-                    <input id="name" name="name" type="text" placeholder="Classic" value="{self.tempvar.name}">
+                    <input required id="name" name="name" type="text" placeholder="Classic" value="{self.tempvar.name}">
                 </div>
                 <div class="flex">
                     <label for="author">Author</label>
-                    <input id="author" name="author" type="text" placeholder="Allan Calhamer">
+                    <input required id="author" name="author" type="text" placeholder="Allan Calhamer">
                 </div>
                 <div class="flex">
-                    <label for="description">Description</label>
-                    <textarea id="description" name="description" placeholder="Website: https://en.wikipedia.org/wiki/Diplomacy_(game)">
+                    <label for="description">Rules &amp; Information</label>
+                    <textarea id="description" name="description" placeholder="**Website**: https://en.wikipedia.org/wiki/Diplomacy_(game)"></textarea>
                 </div>
-                <img id="map">
+                <img id="map" src="data:image/svg+xml;base64,{@ BASE64_STANDARD.encode(self.tempvar.svg.as_bytes()) }">
                 <p style="text-align:center">
                     <button class="accent">Submit</button>
                 </p>

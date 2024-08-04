@@ -19,6 +19,7 @@ struct TempVariant {
 
     pub powers: HashMap<String, PowerMeta>,
     pub starting_state: MapState,
+    pub home_sc: HashMap<ProvinceAbbr, String>,
     pub provinces: HashMap<ProvinceAbbr, ProvinceMeta>,
 
     pub adj: Map,
@@ -109,7 +110,7 @@ fn home(cookies: &CookieJar<'_>, state: &State<AppState>) -> RawHtml<String> {
 fn encode_error<T: Debug>(e: T) -> String {
     let d = format!("{:?}", e);
     BASE64_STANDARD.encode(d.as_bytes()).replace("=", "%3D")
-}
+} 
 
 #[litem::template("pages/error.html")]
 struct ErrorPage<'a> {
@@ -141,10 +142,12 @@ fn rocket() -> _ {
         error_page,
 
         new_variant::submit_variant,
-        new_variant::new_variant,
+        new_variant::new_variant_page,
         new_variant::new_variant_2,
         new_variant::new_variant_files,
         new_variant::variant_meta,
+        new_variant::variant_page,
+        new_variant::variant_map,
     ])
     .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {

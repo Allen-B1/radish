@@ -21,6 +21,8 @@ pub struct MapMeta {
 
     pub powers: HashMap<String, PowerMeta>,
     pub starting_state: MapState,
+    pub home_sc: HashMap<ProvinceAbbr, String>,
+
     pub provinces: HashMap<ProvinceAbbr, ProvinceMeta>,
 
     /// Any miscellaneous data.

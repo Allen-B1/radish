@@ -36,16 +36,16 @@
                 <div style="flex-grow:1;padding:16px;padding-top:0">
                     <h3>What to Upload</h3>
                     <ol>
-                        <li>A map in <code>.svg</code> format with the following features:</li>
+                        <li>A map in <code>.svg</code> format with</li>
                         <ol type="a">
-                            <li>The <code>id</code> of each land tile is set to the province abbreviation</li>
-                            <li>The <code>id</code> of each supply center marker is set to <code>sc-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
-                            <li>For each province there is an object with id <code>unit-Abbr</code> where <code>Abbr</code> is the province abbreviation</li>
-                            <li>For each coast there is an object with id <code>unit-Abbr-xc</code> where <code>Abbr</code> is the province abbreviation
-                                and <code>xc</code> is the coast name</li>
+                            <li>for each province with abbreviation Abbr, a shape with id <code>Abbr</code>,</li>
+                            <li>for each supply center, a shape with id <code>sc-Abbr</code>,</li>
+                            <li>for each starting unit, a shape with id <code>army-Abbr</code>, <code>fleet-Abbr</code>, or <code>fleet-Abbr-nc</code>; and/li>
+                            <li>for each power, a text object with id <code>power-PowerAbbr</code> with the name of the power,
+                                with fill set to the tile color, and stroke set to the supply center color    
+                            </li>
                         </ol>
-                        <li>A province adjacency <code>.json</code> file.</li>
-                        <li>(Optional) A metadata <code>.json</code> file. If not included, the information will be filled out on the next page.</li>
+                        <li>A province adjacency <code>adj.json</code> file generated from the <a href="http://allen-b1.github.io/dipadj" target="_blank">diplomacy adjacency graph generator</a>.</li>
                     </ol>
                 </div>
             </div>

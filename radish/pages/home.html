@@ -9,11 +9,17 @@
 
         <main>
             <h1 style="font-size:128px">
-                Hello!
+                {:if self.user_name != ""}Hello!{:else}Welcome!{:end}
             </h1>
             <p>
+                {:if self.user_name != ""} 
                 <a class="button accent" href="/game/new">New Game</a>
                 <a class="button accent" href="/variant/new">Upload Variant</a>
+                {:else}
+                Welcome to Radish, an online diplomacy website!
+                </p><p>
+                <a class="button accent" href="/signin">Sign up!</a>
+                {:end}
             </p>
         </main>
     </body>
