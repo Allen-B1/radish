@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>{self.variant.meta.name} | Radish</title>
+        {:include HeadComponent}
+        <!--{#-->
+        <style>
+            p > label { white-space: nowrap;
+                margin-right: 16px;
+            }
+            h1, .center { text-align:  center;}
+            #map { width: 100%; }
+        </style>
+        <!--}-->
+    </head>
+    <body>
+        {:include HeaderComponent { user_name : self.user_name.to_string() }}
+        <main>
+            <h1>{ self.variant.meta.name }</h1>
+            <p class="center">By { self.variant.meta.author }</p>
+            <img id="map" src="/variant/{self.variant_id}/map.svg">
+        </main>
+    </body>
+</html>
