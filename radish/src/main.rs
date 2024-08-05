@@ -132,9 +132,9 @@ fn error_page(cookies: &CookieJar<'_>, state: &State<AppState>, msg: &str, detai
     }.render_string().unwrap())
 }
 
-#[launch]
-fn rocket() -> _ {
-    rocket::build().mount("/", routes![
+#[shuttle_runtime::main]
+async fn rocket() -> shuttle_rocket::ShuttleRocket {
+    let rocket = rocket::build().mount("/", routes![
         game,
         signin,
         auth,
@@ -154,5 +154,7 @@ fn rocket() -> _ {
             users: DashMap::new(),
             temp_variants: DashMap::new(),
             variants: DashMap::new()
-        })
+        });
+
+    Ok(rocket.into())
 } 

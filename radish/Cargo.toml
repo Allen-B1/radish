@@ -14,3 +14,5 @@ litem = { git = "https://github.com/Allen-B1/litem.git" }
 roxmltree = "0.20"
 serde_json = "1"
 base64 = "0.22"
+shuttle-runtime = "0.47.0"
+shuttle-rocket = "0.47.0"
