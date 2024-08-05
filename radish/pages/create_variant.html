@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Create Variant | Radish</title>
+        <link rel="stylesheet" href="../static/style.css">
+        {:include HeadComponent}
+        <!--{#-->
+        <style>
+            .flex {
+                display: flex;
+                flex-direction: row;
+                align-items: center;
+            }
+            .flex > label { white-space: nowrap;
+                margin-right: 16px;
+                color: rgba(255,255,255,0.5);
+                text-align: right;
+            }
+            .color {
+                min-width: 32px;
+            }
+            .abbr {
+                width: 64px;
+            }
+            
+            h3 {
+                margin-top: 16px;
+            }
+
+            .prov-name {
+                width: 100%;
+                box-sizing: border-box
+            }
+            .prov-type {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+        </style>
+        <!--}-->
+    </head>
+    <body>
+        {:include HeaderComponent { user_name : self.user_name.to_string() }}
+        <main>
+            <h1>Create Variant</h1>
+            
+            <div class="folder" id="folder-1">
+                <a class="folder-title" href="#folder-1">1: Create Map File</a>
+                <div class="folder-content">
+                    <p>Using <a href="https://inkscape.org/" target="_blank">Inkscape</a> or another vector graphics editor, 
+                        create an SVG file.</p>
+    
+                    <a class="button" href="#folder-2">Next</a>
+                </div>
+            </div>
+
+            <div class="folder" id="folder-2">
+                <a class="folder-title" href="#folder-2">2: Create Adjacency Graph</a>
+                <div class="folder-content">
+                    <p>Visit the <a href="https://allen-b1.github.io/dipadj/" target="_blank">adjacency graph editor</a>
+                        and upload the <code>adj.json</code> and <code>pos.json</code> files.</p>
+
+                    <p class="flex">
+                        <label style="flex-grow: 1" for="adj">adj.json</label>
+                        <input id="adj" type="file" required accept="application/json">
+                    </p>
+                    <p class="flex">
+                        <label style="flex-grow: 1" for="pos">pos.json</label>
+                        <input id="pos" type="file" required accept="application/json">
+                    </p>
+                    <a class="button" href="#folder-3">Next</a>
+                </div>
+            </div>
+
+            <div class="folder" id="folder-3">
+                <a class="folder-title" href="#folder-3">3: Update Map File</a>
+                <div class="folder-content">
+
+                    <p>Update your map file.</p>
+                    <input id="upload_map" type="file" required accept="image/svg+xml">
+                    <img style="width:100%" id="map-img">
+                    <a class="button" href="#folder-4">Next</a>
+                </div>
+            </div>
+
+            <div class="folder" id="folder-4">
+                <a class="folder-title" href="#folder-4">4: Review Map Information</a>
+                <div class="folder-content">
+                    <h3>Powers</h3>
+                    <table id="powers">
+                        <thead>
+                            <tr>
+                                <th>Abbr.</th>
+                                <th style="min-width:128px">Power Name</th>
+                                <th colspan="2">Colors</th>
+                                <th style="width:40%">Starting SCs</th>
+                                <th style="width:40%">Starting Units</th>
+                                <th>...</th>
+                            </tr>
+                        </thead>
+                    </table>    
+
+                    <h3>Provinces</h3>
+                    <table id="provinces">
+                        <thead>
+                            <tr>
+                                <th>Abbr.</th>
+                                <th style="width:70%">Province Name</th>
+                                <th>Type</th>
+                                <th style="width:30%">SC</th>
+                            </tr>
+                        </thead>
+                    </table>
+                </div>
+            </div>
+        </main>
+
+        <!-- {# -->
+
+        <script>
+            let mapDoc = null;
+            let adjData = null;
+            function updateMap() {
+                let powers = {};
+                let provinces = {};
+
+                try {
+                    for (let abbr in adjData.provinces) {
+                        provinces[abbr] = {
+                            name: abbr,
+                            is_sc: false,
+                            home_sc: "",
+                            unit: null,
+                        };
+
+                        let tileElem = mapDoc.getElementById(abbr);
+                        let fill = null;
+                        if (tileElem != null) {
+                            fill = tileElem.style.fill;
+                            powers[fill] = powers[fill] || {
+                                ownership: [],
+                                sc_color: null,
+                            };
+                            powers[fill].ownership.push(abbr);
+                        } else {
+                            console.warn("No tile found for " + abbr);
+                        }
+
+                        let scElem = mapDoc.getElementById("sc-" + abbr);
+                        if (scElem != null) {
+                            provinces[abbr].is_sc = true;
+                            if (powers[fill]) {
+                                powers[fill].sc_color = scElem.style.fill;
+                                provinces[abbr].home_sc = fill;
+                            }
+                        }
+
+                        let labelElem = mapDoc.getElementById("label-" + abbr);
+                        if (labelElem != null) {
+                            provinces[abbr].name = labelElem.textContent;
+                        }
+
+                        let possibleIDs = adjData.provinces[abbr].coasts.map(c => "fleet-" + abbr + "-" + c).concat(["fleet-" + abbr, "army-" + abbr]);
+                        for (let id of possibleIDs) {
+                            let unitElem = mapDoc.getElementById(id);
+                            if (unitElem != null) {
+                                provinces[abbr].unit = id.startsWith("army-") ? ["A"] : ["F", id.split("-")[2] || ""];
+                                break;
+                            }
+                        }
+                    }
+
+                    // find home SCs
+                    for (let abbr in adjData.provinces) {
+                        let homeScElem = mapDoc.getElementById("sc-" + abbr + "-home");
+                        if (homeScElem != null) {
+                            let power = Object.keys(powers).filter(p => powers[p].sc_color == homeScElem.style.fill);
+                            if (power.length != 0) {
+                                provinces[abbr].home_sc = power[0];
+                            } else {
+                                provinces[abbr].home_sc = "";
+                            }
+                        }
+                    }
+                } catch(e) {
+                    console.error(e);
+                }
+
+                console.log("power", powers);
+                console.log("prov", provinces);
+
+                let power_ids = Object.keys(powers);
+                power_ids.sort();
+                let table = document.getElementById("powers");
+                table.createTBody().innerHTML = "";
+                for (let power_id of power_ids) {
+                    let row = table.createTBody().insertRow(-1);
+                    
+                    let abbrElem = row.insertCell(-1);
+                    let inputElem = document.createElement("input");
+                    inputElem.setAttribute("data-fill", power_id);
+                    inputElem.type = "text";
+                    inputElem.className = "input abbr";
+                    inputElem.placeholder = "Abbr";
+                    inputElem.oninput = updateSCTypes;
+                    abbrElem.appendChild(inputElem);
+
+                    let nameElem = row.insertCell(-1);
+                    inputElem = document.createElement("input");
+                    inputElem.type = "text";
+                    inputElem.className = "input name";
+                    inputElem.placeholder = "Power Name";
+                    nameElem.appendChild(inputElem);
+
+                    let colorElem = row.insertCell(-1);
+                    colorElem.className = "color";
+                    colorElem.style.background = power_id;
+
+                    let scElem = row.insertCell(-1);
+                    scElem.className = "color";
+                    scElem.style.background = powers[power_id].sc_color || "transparent";
+
+                    let ownershipElem = row.insertCell(-1);
+                    ownershipElem.textContent = powers[power_id].ownership.filter(abbr => provinces[abbr].is_sc).join(", ");
+
+                    let unitElem = row.insertCell(-1);
+                    unitElem.textContent = powers[power_id].ownership
+                        .filter(abbr => provinces[abbr].unit)
+                        .map(abbr => provinces[abbr].unit[0] + " " + abbr + (provinces[abbr].unit[1] ? " (" + provinces[abbr].unit[1] + ")" : ""))
+                        .join(", ");
+
+                    let delElem = row.insertCell(-1);
+                    let btnElem = document.createElement("button");
+                    btnElem.className = "button danger";
+                    btnElem.innerHTML = "&times;";
+                    btnElem.onclick = () => { 
+                        if (confirm("Are you sure you want to delete '" + inputElem.value + "'?")) {
+                            row.remove();
+                            updateSCTypes();
+                        }
+                    };
+                    delElem.appendChild(btnElem);
+                }
+
+                let provTable = document.getElementById("provinces");
+                provTable.createTBody().innerHTML = "";
+                let province_ids = Object.keys(provinces);
+                province_ids.sort();
+                for (let abbr of province_ids) {
+                    let province = provinces[abbr];
+                    let row = provTable.createTBody().insertRow(-1);
+
+                    let abbrElem = row.insertCell(-1);
+                    abbrElem.className = "prov-abbr";
+                    abbrElem.textContent = abbr;
+
+                    let nameElem = row.insertCell(-1);
+                    inputElem = document.createElement("input");
+                    inputElem.type = "text";
+                    inputElem.className = "input prov-name";
+                    inputElem.placeholder = "Livonia";
+                    inputElem.value = province.name;
+                    nameElem.appendChild(inputElem);
+
+                    let typeElem = row.insertCell(-1);
+                    typeElem.className = "prov-type";
+                    typeElem.textContent = adjData.provinces[abbr].is_sea ? "Sea" : "Land";
+
+                    let scElem = row.insertCell(-1);
+                    scElem.className = "prov-sc";
+                    scElem.setAttribute("data-fill", province.home_sc);
+                    scElem.textContent = !province.is_sc ? "None" : (province.home_sc ? "Home" : "Neutral");
+                }
+            }
+
+            function updateSCTypes() {
+                let elems = document.getElementsByClassName("prov-sc");
+                for (let elem of elems) {
+                    let fill = elem.getAttribute("data-fill");
+                    if (fill) {
+                        let textElem = document.querySelector("[data-fill=\"" + fill + "\"]");
+                        elem.textContent = textElem ? ("Home: " + textElem.value) : "Neutral";
+                    }
+                }
+            }
+
+            const uploadMap = document.getElementById("upload_map");
+            uploadMap.value = null;
+            uploadMap.addEventListener("change", async function() {
+                let file = uploadMap.files[0];
+                if (file) {
+                    let text = await file.text();
+
+                    try {
+                        mapDoc =  new DOMParser().parseFromString(text, "text/xml");
+                        document.getElementById("map-img").src = "data:image/svg+xml;base64," + btoa(text);
+                    } catch (e) {
+                        mapDoc = null;
+                        document.getElementById("map-img").src = "data:image/svg+xml;base64,";
+                    }
+                    updateMap();
+                }
+            });
+
+            const uploadAdj = document.getElementById("adj");
+            uploadAdj.value = null;
+            uploadAdj.addEventListener("change", async function() {
+                let file = uploadAdj.files[0];
+                if (file) {
+                    let text = await file.text();
+                    try {
+                        adjData = JSON.parse(text);
+                    } catch(e) {
+                        adjData = null;
+                    }
+                    updateMap();
+                }
+            });
+        </script>
+        <!-- } -->
+    </body>
+</html>

@@ -11,6 +11,7 @@ use crate::{MapState, ProvinceAbbr};
 pub struct ProvinceMeta {
     pub name: String,
     pub is_sc: bool,
+    pub home_sc: String,
 }
 
 /// Metadata associated to a map.
@@ -21,7 +22,6 @@ pub struct MapMeta {
 
     pub powers: HashMap<String, PowerMeta>,
     pub starting_state: MapState,
-    pub home_sc: HashMap<ProvinceAbbr, String>,
 
     pub provinces: HashMap<ProvinceAbbr, ProvinceMeta>,
 

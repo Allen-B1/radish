@@ -141,13 +141,7 @@ async fn rocket() -> shuttle_rocket::ShuttleRocket {
         home,
         error_page,
 
-        new_variant::submit_variant,
-        new_variant::new_variant_page,
-        new_variant::new_variant_2,
-        new_variant::new_variant_files,
-        new_variant::variant_meta,
-        new_variant::variant_page,
-        new_variant::variant_map,
+        new_variant::create_variant_page
     ])
     .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {

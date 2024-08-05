@@ -6,6 +6,11 @@ body {
     color: #fff;
 }
 
+a { 
+    color: hsl(200, 50%, 45%); }
+a:visited {
+    color: hsl(270, 50%, 55%); }
+
 .block {
     padding: 16px;
     border-radius: 0;
@@ -61,13 +66,26 @@ h1 {
 .button, button, ::file-selector-button {
     border: 0;
     background: hsl(330, 50%, 45%);
-    color: #fff;
+    color: #fff !important;
     text-decoration: none !important;
     cursor: pointer;
     display: inline-block;
     padding: 4px 8px;
     border-radius: 0;
     font-size: 15px;
+}
+
+.input {
+    color: #fff;
+    padding: 4px 8px;
+    border: 2px solid hsla(0, 0%, 50%, 0.5);
+    background: transparent;
+}
+.input::placeholder {
+    color: rgba(255,255,255,0.5);
+}
+.input:focus {
+    border-color: hsl(330, 50%, 45%);
 }
 
 .button:active, button:active, ::file-selector-button:active {
@@ -94,3 +112,23 @@ h1 {
 .g_id_signin div {
     border-radius: 0 !important;
 }
+
+.folder {
+    display: block;
+}
+.folder-title {
+    display: block;
+    color: #fff !important;
+    background: hsl(200, 10%, 15%);
+    padding: 8px 16px;
+    text-decoration: none; }
+.folder-content {
+    background: hsl(200, 10%, 11%);
+    padding: 16px;
+    display: none; }
+.folder-content > :first-child { margin-top: 0; }
+
+.folder:target > .folder-content {
+    display: block;  }
+.folder:target > .folder-title {
+    background: hsl(330, 50%, 45%); }
