@@ -7,7 +7,7 @@ use crate::{encode_error, AppState, TempVariant, Variant};
 use crate::{HeadComponent, HeaderComponent};
 use base64::{Engine, prelude::BASE64_STANDARD};
 
-
+ 
 #[litem::template("pages/create_variant.html")]
 struct CreateVariantPage {  
     user_name: String,

@@ -117,6 +117,10 @@
         <!-- {# -->
 
         <script>
+            if (location.hash == "") {
+                location.href = "#folder-2";
+            }
+
             let mapDoc = null;
             let adjData = null;
             function updateMap() {
@@ -277,8 +281,9 @@
                 for (let elem of elems) {
                     let fill = elem.getAttribute("data-fill");
                     if (fill) {
-                        let textElem = document.querySelector("[data-fill=\"" + fill + "\"]");
-                        elem.textContent = textElem ? ("Home: " + textElem.value) : "Neutral";
+                        let textElem = document.querySelector(".abbr[data-fill=\"" + fill + "\"]");
+                        console.log(textElem);
+                        elem.textContent = textElem ? (textElem.value == "" ? "Home" : "Home: " + textElem.value) : "Neutral";
                     }
                 }
             }
