@@ -77,6 +77,10 @@ impl Order for Hold {
     ) -> Option<bool> {
         is_dislodged(map, state, orders, this_prov, order_status)
     }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
+    }
 }
 
 /// A move order.
@@ -270,6 +274,10 @@ impl Order for Move {
             None
         }
     }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
+    }
 }
 
 /// A support hold order.
@@ -381,6 +389,10 @@ impl Order for SupportHold {
             is_untapped(map, state, orders, order_status, this_prov, "")
         }
     }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
+    }
 }
 
 /// A support move order.
@@ -454,6 +466,10 @@ impl Order for SupportMove {
             is_untapped(map, state, orders, order_status, this_prov, &self.dest)
         }
     }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
+    }
 }
 
 /// A convoy order.
@@ -495,6 +511,10 @@ impl Order for Convoy {
             return Some(false)
         }
         is_dislodged(map, state, orders, this_prov, order_status)
+    }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
     }
 }
 

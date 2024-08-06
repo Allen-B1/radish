@@ -1,5 +1,5 @@
 use core::str;
-use std::{collections::{HashMap, HashSet}, error::Error, fmt::Debug};
+use std::{collections::{HashMap, HashSet}, error::Error, fmt::Debug, sync::Arc};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use dashmap::DashMap;
@@ -16,10 +16,11 @@ fn gen_id() -> String{
     nanoid!(16, &"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".chars().collect::<Vec<_>>())
 }
 
+#[derive(Clone)]
 struct AppState {
-    pub users: DashMap<String, UserMeta>,
-    pub variants: DashMap<String, Variant>,
-    pub games: DashMap<String, Game>
+    pub users: Arc<DashMap<String, UserMeta>>,
+    pub variants: Arc<DashMap<String, Variant>>,
+    pub games: Arc<DashMap<String, Game>>
 }
 
 struct Variant {
@@ -184,9 +185,9 @@ async fn rocket() -> shuttle_rocket::ShuttleRocket {
     ])
     .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {
-            users: DashMap::new(),
-            variants: DashMap::new(),
-            games: DashMap::new()
+            users: Arc::new(DashMap::new()),
+            variants: Arc::new(DashMap::new()),
+            games: Arc::new(DashMap::new())
         });
 
     Ok(rocket.into())

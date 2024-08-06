@@ -1,7 +1,8 @@
 use std::{collections::{HashMap, HashSet}, io::{Cursor, Read}};
 
 use radip::{utils::MapMeta, Map, MapState, Orders, ProvinceAbbr};
-use rocket::{form::Form, fs::{NamedFile, TempFile}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, time::Duration, tokio::io::AsyncReadExt, State};
+use rocket::{form::Form, fs::{NamedFile, TempFile}, futures::{SinkExt, StreamExt}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, time::Duration, tokio::{io::AsyncReadExt, select, sync::broadcast}, State};
+use ws::{stream::DuplexStream, Message};
 
 use crate::{encode_error, gen_id, AppState, HeadComponent, HeaderComponent, Variant};
 
@@ -96,8 +97,33 @@ pub struct GameState {
     pub orders: Orders
 }
 
+#[derive(Deserialize, Clone)]
+#[serde(rename_all="snake_case", tag = "type")]
+enum InMessage {
+    Auth { token: String }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all="snake_case", tag = "type")]
+enum OutMessage {
+    UpdatePlayers { players: HashSet<String> },
+
+    Phase {
+        year: u8,
+        phase: GamePhase,
+    },
+
+    MovementAdj {
+        year: u8,
+        phase: GamePhase,
+        orders: Orders,
+        order_status: HashMap<String, bool>
+    }
+}
+
 pub struct Game {
     pub meta: GameMeta,
+    pub broadcast: broadcast::Sender<OutMessage>,
     pub players: HashSet<String>,
     pub state: Option<GameState>
 }
@@ -147,6 +173,8 @@ pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>
         });
     }
 
+    let (sender, _) = broadcast::channel(16);
+
     let game_id = gen_id();
     state.games.insert(game_id.clone(), Game {
         meta: GameMeta {
@@ -164,7 +192,10 @@ pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>
                 TimeUnit::Min => Duration::minutes(form.time_mvmt  as i64),
                 TimeUnit::Hr => Duration::hours(form.time_mvmt  as i64)
             }
-        }
+        },
+        broadcast: sender,
+        players: HashSet::from([token.to_string()]),
+        state: None
     });
 
     Ok(Redirect::to(format!("/games/{}", game_id)))
@@ -182,3 +213,57 @@ pub fn game_meta(state: &State<AppState>, id: &str) -> Result<Json<GameMeta>, St
     Ok(Json(game.meta.clone()))
 }
 
+async fn handle_in_message(state: &AppState, game_id: &str, msg: InMessage, stream: &mut DuplexStream) -> Result<(), ()> {
+    match msg {
+        InMessage::Auth { token } => {
+            if state.users.contains_key(&token) {
+                let mut game = state.games.get_mut(game_id).ok_or(())?;   
+                game.players.insert(token);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[get("/games/<id>/ws")]
+pub fn game_stream(state: &State<AppState>, id: &str, ws: ws::WebSocket) -> Result<ws::Channel<'static>, Status> {
+    let game = state.games.get(id).ok_or(Status::NotFound)?;
+    let mut broadcast = game.broadcast.subscribe();
+    drop(game);
+
+    let id = id.to_string();
+    let state = state.inner().clone();
+
+    Ok(ws.channel(move |mut stream| Box::pin(async move {
+        loop {
+            select! {
+                message = stream.next() => {
+                    if message.is_none() {
+                        break
+                    }
+                    match message.unwrap()? {
+                        Message::Text(text) => {
+                            let msg: InMessage = match serde_json::from_str(&text) {
+                                Ok(msg) => msg,
+                                Err(err) => { eprintln!("{:?}", err); continue }
+                            };
+                            
+                            handle_in_message(&state, &id, msg, &mut stream).await;
+                        },
+                        Message::Ping(data) => {
+                            stream.send(Message::Pong(data)).await?;
+                        },
+                        _ => {}
+                    }
+                },
+
+                Ok(message) = broadcast.recv() => {
+                    stream.send(Message::Text(serde_json::to_string(&message).unwrap_or_else(|e| format!("error: {:?}", e)))).await?;
+                }
+            }
+        }
+
+        Ok(())
+    })))
+}

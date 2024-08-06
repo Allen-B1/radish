@@ -99,7 +99,7 @@ impl<T: Any> AsAny for T {
 ///
 /// Downcasting is supported via [`Any::downcast_ref`](std::any::Any::downcast_ref) and [`Any::is`](std::any::Any::is).
 #[typetag::serde(tag = "type")]
-pub trait Order: 'static + Debug + AsAny {
+pub trait Order: 'static + Debug + AsAny + Send + Sync {
     /// Return orders (identified by source province) that this order depends on
     /// for resolution.
     fn deps(
@@ -120,12 +120,20 @@ pub trait Order: 'static + Debug + AsAny {
         this_prov: &str,
         order_status: &HashMap<String, bool>,
     ) -> Option<bool>;
+
+    fn as_owned(&self) -> Box<dyn Order>;
 }
 
 impl Deref for dyn Order {
     type Target = dyn Any;
     fn deref(&self) -> &Self::Target {
         self.as_any()
+    }
+}
+
+impl Clone for Box<dyn Order> {
+    fn clone(&self) -> Self {
+        self.as_owned()
     }
 }
 

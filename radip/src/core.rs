@@ -30,4 +30,8 @@ impl Order for Core {
         ) -> Option<bool> {
         base::is_untapped(map, state, orders, order_status, this_prov, "")
     }
+
+    fn as_owned(&self) -> Box<dyn Order> {
+        Box::new(self.clone())
+    }
 }
