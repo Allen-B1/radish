@@ -20,3 +20,4 @@ shuttle-rocket = "0.47.0"
 serde = { version = "1", features = ["derive"]}
 zip = "2.1"
 nanoid = "0.4"
+ws = { package = "rocket_ws", version = "0.1.1" }

@@ -1,6 +1,6 @@
-use std::{collections::HashMap, io::{Cursor, Read}};
+use std::{collections::{HashMap, HashSet}, io::{Cursor, Read}};
 
-use radip::{utils::MapMeta, Map, ProvinceAbbr};
+use radip::{utils::MapMeta, Map, MapState, Orders, ProvinceAbbr};
 use rocket::{form::Form, fs::{NamedFile, TempFile}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, time::Duration, tokio::io::AsyncReadExt, State};
 
 use crate::{encode_error, gen_id, AppState, HeadComponent, HeaderComponent, Variant};
@@ -75,8 +75,31 @@ pub struct GameMeta {
     pub variant: String,
 }
 
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all="snake_case")]
+pub enum GamePhase {
+    Spring,
+    SpringRetreat,
+    Fall,
+    FallRetreat,
+    Winter
+}
+
+pub struct GameState {
+    pub map_state: MapState,
+    pub year: u8,
+    pub phase: GamePhase,
+    pub next_adjudication: u64,
+    
+    // user id => power
+    pub players: HashMap<String, String>,
+    pub orders: Orders
+}
+
 pub struct Game {
-    pub meta: GameMeta
+    pub meta: GameMeta,
+    pub players: HashSet<String>,
+    pub state: Option<GameState>
 }
 
 #[post("/games/new/submit", data = "<form>")]
@@ -158,3 +181,4 @@ pub fn game_meta(state: &State<AppState>, id: &str) -> Result<Json<GameMeta>, St
     let game: dashmap::mapref::one::Ref<String, Game> = state.games.get(id).ok_or(Status::NotFound)?;
     Ok(Json(game.meta.clone()))
 }
+
