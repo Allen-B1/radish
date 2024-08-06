@@ -179,6 +179,7 @@ async fn rocket() -> shuttle_rocket::ShuttleRocket {
         games::create_game_submit,
         games::game,
         games::game_meta,
+        games::game_stream,
 
         variant_adj, variant_svg, variant_pos, variant_meta,
         create_variant_page

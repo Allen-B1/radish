@@ -82,7 +82,6 @@
                 circleElem.setAttribute("cx", x+"");
                 circleElem.setAttribute("cy", y+"");
                 circleElem.setAttribute("r", 24*vr);
-                circleElem.style.strokeWidth = 1*vr;
                 circleElem.classList.add("tile", "added");
                 circleElem.style.zIndex = "9";
 
@@ -100,11 +99,11 @@
 
 <style>
     :global(.tile.added) {
-        fill: transparent;
+        fill: rgba(0,0,0,0.8);
         stroke: #000;
     }
     :global(.tile.added):hover {
-        fill: rgba(0,0,0,0.8);
+        fill: rgba(0,0,0,0.64);
     }
     :global(.tile):hover {
         filter: brightness(80%);

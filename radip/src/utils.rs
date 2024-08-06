@@ -44,7 +44,7 @@ pub struct RetreatOptions {
     pub src: Unit,
 
     /// The available retreat locations.
-    pub dest: HashMap<String, Unit>,
+    pub dest: HashSet<(String, String)>,
 }
 
 /// Update the game board based on adjudication results.
@@ -64,7 +64,7 @@ pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, orde
                 if state.units.contains_key(&mov.dest.0) {
                     retreats.insert(mov.dest.0.clone(), RetreatOptions {
                         src: state.units[&mov.dest.0].clone(),
-                        dest: HashMap::new()
+                        dest: HashSet::new()
                     });
                 }
 
@@ -82,14 +82,14 @@ pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, orde
             Unit::Army(natl) => {
                 for (src, dest) in map.army_adj.iter() {
                     if src == src_prov && !contested.contains(dest) && !state.units.contains_key(dest) {
-                        retreat.dest.insert(dest.to_string(), Unit::Army(natl.to_string()));
+                        retreat.dest.insert((dest.to_string(), "".to_string()));
                     }
                 }
             },
             Unit::Fleet(natl, src_coast) => {
                 for (src, dest) in map.fleet_adj.iter() {
                     if src.0 == *src_prov && src.1 == *src_coast && !contested.contains(&dest.0) && !state.units.contains_key(&dest.0) {
-                        retreat.dest.insert(dest.0.to_string(), Unit::Fleet(natl.to_string(), dest.1.to_string()));
+                        retreat.dest.insert((dest.0.to_string(),dest.1.to_string()));
                     }
                 }
             }

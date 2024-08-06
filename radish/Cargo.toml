@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 rocket =  {version = "0.5", features = [ "json" ] }
 time = { version = "0.3", features = ["serde"]}
+tokio = "1"
 radip = { path = "../radip" }
 google_auth_verifier = "0.1.4"
 dashmap = "6.0"
@@ -21,3 +22,4 @@ serde = { version = "1", features = ["derive"]}
 zip = "2.1"
 nanoid = "0.4"
 ws = { package = "rocket_ws", version = "0.1.1" }
+rand =  "0.8"
