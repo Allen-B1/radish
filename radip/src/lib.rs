@@ -65,7 +65,7 @@ pub struct MapState {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data")]
+#[serde(tag = "type", content = "data", rename_all = "lowercase")]
 pub enum Unit {
     Army(String),
     Fleet(String, String),

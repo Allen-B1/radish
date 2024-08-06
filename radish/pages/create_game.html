@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Create Game | Radish</title>
+        {:include HeadComponent}
+
+        <!-- {#-->
+         <style>
+        .flex {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+        }
+        .flex > label { white-space: nowrap;
+            color: rgba(255,255,255,0.5);
+            margin-right: 16px;
+            flex-grow: 1;
+        }
+        </style>
+        <!-- } -->
+    </head>
+    <body>
+        {:include HeaderComponent { user_name: self.user_name.to_string() } }
+
+        <main>
+            <form method="POST" action="/games/new/submit" enctype="multipart/form-data">
+                <div class="flex">
+                    <label for="name">Game Name</label>
+                    <input required class="input" type="text" name="name" id="name">    
+                </div>
+                <div class="flex">
+                    <label for="variant">Variant</label>
+                    <input required type="file" accept="application/zip" name="variant" id="variant">    
+                </div>
+                <div class="flex">
+                    <label for="press">Press</label>
+                    <select class="button" name="press" id="press">
+                        <option value="full">Full</option>
+                        <option value="rulebook">Rulebook</option>
+                        <option value="public">Public Only</option>
+                        <option value="gunboat">Gunboat (None)</option>
+                    </select>
+                </div>
+                <div class="flex">
+                    <label for="end_year">End Year</label>
+                    <input class="input" type="number" min="2" max="50" name="end_year" id="end_year" placeholder="08">
+                </div>
+                <div class="flex">
+                    <label for="time_mvmt">Movement Phase</label>
+                    <input class="input" type="text" min="3" required name="time_mvmt" id="time_mvmt">    
+                    <select class="button" name="time_mvmt_unit">
+                        <option value="min">min</option>
+                        <option value="hr">hr</option>
+                    </select>
+                </div>
+                <div class="flex">
+                    <label for="time_build">Build &amp; Retreat Phase</label>
+                    <input class="input" type="number" min="1" required name="time_build" id="time_build">    
+                    <select class="button" name="time_build_unit">
+                        <option value="min">min</option>
+                        <option value="hr">hr</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="accent">Create</button>
+            </form>
+        </main>
+    </body>
+</html>

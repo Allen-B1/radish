@@ -75,6 +75,19 @@ h1 {
     font-size: 15px;
 }
 
+input[type=color] {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    padding: 0;
+}
+input[type=color]:active {
+    filter: brightness(75%);
+}
+::-moz-color-swatch, ::-webkit-color-swatch {
+    border: 0;
+}
+
 .input {
     color: #fff;
     padding: 4px 8px;
@@ -86,6 +99,7 @@ h1 {
 }
 .input:focus {
     border-color: hsl(330, 50%, 45%);
+    outline: none;
 }
 
 .button:active, button:active, ::file-selector-button:active {

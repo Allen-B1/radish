@@ -8,7 +8,7 @@
         {:include HeaderComponent { user_name: self.user_name.to_string() } }
 
         <main>
-            <h1>Error{:if self.msg != ""}: {self.msg}{:end}</h1>
+            <h1>{self.msg}</h1>
             {:if self.details != ""}
                 <p>Details:</p>
                 <pre>{self.details}</pre>

@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet};
+/*use std::collections::{HashMap, HashSet};
 
 use radip::{utils::{MapMeta, PowerMeta, ProvinceMeta}, MapState, Unit};
 use rocket::{form::Form, fs::TempFile, http::{ContentType, CookieJar, Status}, response::{content::{RawHtml, RawJson}, Redirect}, serde::json::Json, tokio::io::AsyncReadExt, State};
@@ -7,24 +7,6 @@ use crate::{encode_error, AppState, TempVariant, Variant};
 use crate::{HeadComponent, HeaderComponent};
 use base64::{Engine, prelude::BASE64_STANDARD};
 
- 
-#[litem::template("pages/create_variant.html")]
-struct CreateVariantPage {  
-    user_name: String,
-}
-
-
-#[get("/variant/create")]
-pub fn create_variant_page(cookies: &CookieJar<'_>, state: &State<AppState>) -> RawHtml<String> {
-    let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
-    let user_name = state.users.get(token).map(|x| x.name.clone()).unwrap_or_else(String::new);
-
-    RawHtml(CreateVariantPage {
-        user_name
-    }.render_string().unwrap())
-}
-
-/*
 #[litem::template("pages/new_variant.html")]
 struct NewVariantPage {
     user_name: String,

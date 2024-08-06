@@ -3,6 +3,7 @@
     <head>
         <title>Create Variant | Radish</title>
         <link rel="stylesheet" href="../static/style.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" integrity="sha512-XMVd28F1oH/O71fzwBnV7HucLxVwtxf26XV8P4wPk26EDxuGZ91N8bsOttmnomcCD3CS5ZMRL50H0GgOHvegtg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
         {:include HeadComponent}
         <!--{#-->
         <style>
@@ -12,10 +13,15 @@
                 align-items: center;
             }
             .flex > label { white-space: nowrap;
-                margin-right: 16px;
+                margin-left: 16px;
                 color: rgba(255,255,255,0.5);
+            }
+            .flex-right > label {
+                margin-left: 0;
+                margin-right: 16px;
                 text-align: right;
             }
+
             .color {
                 min-width: 32px;
             }
@@ -27,10 +33,6 @@
                 margin-top: 16px;
             }
 
-            .prov-name {
-                width: 100%;
-                box-sizing: border-box
-            }
             .prov-type {
                 padding-left: 16px;
                 padding-right: 16px;
@@ -59,11 +61,11 @@
                     <p>Visit the <a href="https://allen-b1.github.io/dipadj/" target="_blank">adjacency graph editor</a>
                         and upload the <code>adj.json</code> and <code>pos.json</code> files.</p>
 
-                    <p class="flex">
+                    <p class="flex flex-right">
                         <label style="flex-grow: 1" for="adj">adj.json</label>
-                        <input id="adj" type="file" required accept="application/json">
+                        <input id="adj" type="file" pattern="adj-.*" required accept="application/json">
                     </p>
-                    <p class="flex">
+                    <p class="flex flex-right">
                         <label style="flex-grow: 1" for="pos">pos.json</label>
                         <input id="pos" type="file" required accept="application/json">
                     </p>
@@ -83,8 +85,20 @@
             </div>
 
             <div class="folder" id="folder-4">
-                <a class="folder-title" href="#folder-4">4: Review Map Information</a>
+                <a class="folder-title" href="#folder-4">4: Enter Map Information</a>
                 <div class="folder-content">
+                    <h3>Metadata</h3>
+                    <p>
+                        <div class="flex flex-right">
+                            <label style="width:96px" for="map-name">Map Name</label> <input id="map-name" class="input" type="text" placeholder="Classic">
+                        </div>
+                        <div class="flex flex-right">
+                            <label style="width:96px" for="map-author">Map Author</label> <input id="map-author" class="input" type="text" placeholder="Allan B. Calhamer">
+                        </div>
+                        <div class="flex flex-right">
+                            <label style="width:96px" for="map-land-color">Land Color</label> <input id="map-land-color" type="color">
+                        </div>
+                    </p>
                     <h3>Powers</h3>
                     <table id="powers">
                         <thead>
@@ -98,7 +112,13 @@
                             </tr>
                         </thead>
                     </table>    
+                    <a class="button" href="#folder-5">Next</a>
+                </div>
+            </div>
 
+            <div class="folder" id="folder-5">
+                <a class="folder-title" href="#folder-5">5: Review Provinces</a>
+                <div class="folder-content">
                     <h3>Provinces</h3>
                     <table id="provinces">
                         <thead>
@@ -110,6 +130,7 @@
                             </tr>
                         </thead>
                     </table>
+                    <button id="download" class="accent">Download Variant</button>
                 </div>
             </div>
         </main>
@@ -117,12 +138,20 @@
         <!-- {# -->
 
         <script>
+            function standardizeColor(str) {
+                var ctx = document.createElement('canvas').getContext('2d');
+                ctx.fillStyle = str;
+                return ctx.fillStyle;
+            }
+
             if (location.hash == "") {
                 location.href = "#folder-2";
             }
 
             let mapDoc = null;
+            let mapSrc = null;
             let adjData = null;
+            let posData = null;
             function updateMap() {
                 let powers = {};
                 let provinces = {};
@@ -130,7 +159,7 @@
                 try {
                     for (let abbr in adjData.provinces) {
                         provinces[abbr] = {
-                            name: abbr,
+                            name: (posData.provinces[abbr] && posData.provinces[abbr].name) || "",
                             is_sc: false,
                             home_sc: "",
                             unit: null,
@@ -139,7 +168,7 @@
                         let tileElem = mapDoc.getElementById(abbr);
                         let fill = null;
                         if (tileElem != null) {
-                            fill = tileElem.style.fill;
+                            fill = standardizeColor(tileElem.style.fill);
                             powers[fill] = powers[fill] || {
                                 ownership: [],
                                 sc_color: null,
@@ -153,14 +182,9 @@
                         if (scElem != null) {
                             provinces[abbr].is_sc = true;
                             if (powers[fill]) {
-                                powers[fill].sc_color = scElem.style.fill;
+                                powers[fill].sc_color = standardizeColor(scElem.style.fill);
                                 provinces[abbr].home_sc = fill;
                             }
-                        }
-
-                        let labelElem = mapDoc.getElementById("label-" + abbr);
-                        if (labelElem != null) {
-                            provinces[abbr].name = labelElem.textContent;
                         }
 
                         let possibleIDs = adjData.provinces[abbr].coasts.map(c => "fleet-" + abbr + "-" + c).concat(["fleet-" + abbr, "army-" + abbr]);
@@ -177,7 +201,8 @@
                     for (let abbr in adjData.provinces) {
                         let homeScElem = mapDoc.getElementById("sc-" + abbr + "-home");
                         if (homeScElem != null) {
-                            let power = Object.keys(powers).filter(p => powers[p].sc_color == homeScElem.style.fill);
+                            let thisColor = standardizeColor(homeScElem.style.fill);
+                            let power = Object.keys(powers).filter(p => powers[p].sc_color == thisColor);
                             if (power.length != 0) {
                                 provinces[abbr].home_sc = power[0];
                             } else {
@@ -192,12 +217,17 @@
                 console.log("power", powers);
                 console.log("prov", provinces);
 
+                let maxOwnership = Math.max.apply(null, Object.values(powers).map(p => p.ownership.length));
+                let guessLandFill = Object.keys(powers).filter(pid => powers[pid].ownership.length == maxOwnership)[0];
+                document.getElementById("map-land-color").value = guessLandFill;
+
                 let power_ids = Object.keys(powers);
                 power_ids.sort();
                 let table = document.getElementById("powers");
-                table.createTBody().innerHTML = "";
+                Array.from(table.tBodies).forEach(b => b.remove());
+                let tbody = table.createTBody();
                 for (let power_id of power_ids) {
-                    let row = table.createTBody().insertRow(-1);
+                    let row = tbody.insertRow(-1);
                     
                     let abbrElem = row.insertCell(-1);
                     let inputElem = document.createElement("input");
@@ -216,17 +246,19 @@
                     nameElem.appendChild(inputElem);
 
                     let colorElem = row.insertCell(-1);
-                    colorElem.className = "color";
+                    colorElem.className = "color tile-color";
                     colorElem.style.background = power_id;
 
                     let scElem = row.insertCell(-1);
-                    scElem.className = "color";
+                    scElem.className = "color sc-color";
                     scElem.style.background = powers[power_id].sc_color || "transparent";
 
                     let ownershipElem = row.insertCell(-1);
+                    ownershipElem.className = "ownership";
                     ownershipElem.textContent = powers[power_id].ownership.filter(abbr => provinces[abbr].is_sc).join(", ");
 
                     let unitElem = row.insertCell(-1);
+                    unitElem.className = "units";
                     unitElem.textContent = powers[power_id].ownership
                         .filter(abbr => provinces[abbr].unit)
                         .map(abbr => provinces[abbr].unit[0] + " " + abbr + (provinces[abbr].unit[1] ? " (" + provinces[abbr].unit[1] + ")" : ""))
@@ -246,24 +278,23 @@
                 }
 
                 let provTable = document.getElementById("provinces");
-                provTable.createTBody().innerHTML = "";
+
+                Array.from(provTable.tBodies).forEach(b => b.remove());
+                tbody = provTable.createTBody();
+
                 let province_ids = Object.keys(provinces);
                 province_ids.sort();
                 for (let abbr of province_ids) {
                     let province = provinces[abbr];
-                    let row = provTable.createTBody().insertRow(-1);
+                    let row = tbody.insertRow(-1);
 
                     let abbrElem = row.insertCell(-1);
                     abbrElem.className = "prov-abbr";
                     abbrElem.textContent = abbr;
 
                     let nameElem = row.insertCell(-1);
-                    inputElem = document.createElement("input");
-                    inputElem.type = "text";
-                    inputElem.className = "input prov-name";
-                    inputElem.placeholder = "Livonia";
-                    inputElem.value = province.name;
-                    nameElem.appendChild(inputElem);
+                    nameElem.className = "prov-name";
+                    nameElem.textContent = province.name;
 
                     let typeElem = row.insertCell(-1);
                     typeElem.className = "prov-type";
@@ -282,7 +313,6 @@
                     let fill = elem.getAttribute("data-fill");
                     if (fill) {
                         let textElem = document.querySelector(".abbr[data-fill=\"" + fill + "\"]");
-                        console.log(textElem);
                         elem.textContent = textElem ? (textElem.value == "" ? "Home" : "Home: " + textElem.value) : "Neutral";
                     }
                 }
@@ -297,9 +327,10 @@
 
                     try {
                         mapDoc =  new DOMParser().parseFromString(text, "text/xml");
+                        mapSrc = text;
                         document.getElementById("map-img").src = "data:image/svg+xml;base64," + btoa(text);
                     } catch (e) {
-                        mapDoc = null;
+                        mapDoc = mapSrc = null;
                         document.getElementById("map-img").src = "data:image/svg+xml;base64,";
                     }
                     updateMap();
@@ -320,6 +351,100 @@
                     updateMap();
                 }
             });
+
+            const uploadPos = document.getElementById("pos");
+            uploadPos.value = null;
+            uploadPos.addEventListener("change", async function() {
+                let file = uploadPos.files[0];
+                if (file) {
+                    let text = await file.text();
+                    try {
+                        posData = JSON.parse(text);
+                    } catch(e) {
+                        posData = null;
+                    }
+                    updateMap();
+                }
+            });
+
+            document.getElementById("download").addEventListener("click", download);
+
+            function download() {
+                let powers = {};
+                let starting_state = {
+                    units: {},
+                    ownership: {}
+                };
+                for (let row of document.getElementById("powers").tBodies[0].rows) {
+                    let abbr = row.querySelector(".abbr").value;
+
+                    powers[abbr] = {
+                        name: row.querySelector(".name").value,
+                        tile_color: row.querySelector(".tile-color").style.backgroundColor,
+                        sc_color: row.querySelector(".sc-color").style.backgroundColor,
+                    };
+
+                    let ownershipElem = row.querySelector(".ownership");
+                    for (let tile of ownershipElem.textContent.split(", ")) {
+                        starting_state.ownership[tile] = abbr;
+                    }
+
+                    let unitsElem =row.querySelector(".units");
+                    for (let unitStr of unitsElem.textContent.split(",")) {
+                        if (unitStr[0] == "A") {
+                            starting_state.units[unitStr[1]] = {
+                                "type": "army",
+                                "data": abbr
+                            };
+                        } else {
+                            starting_state.units[unitStr[1]] = {
+                                "type": "fleet",
+                                "data": [abbr, unitStr[2] ? unitStr[2].slice(1, -1) : ""]
+                            };
+                        }
+                    }
+                }
+
+                let provinces = {};
+                for (let row of document.getElementById("provinces").tBodies[0].rows) {
+                    let abbr = row.querySelector(".prov-abbr").textContent;
+
+                    let fill = row.querySelector(".prov-sc").getAttribute("data-fill");
+                    let powerNameElem = document.querySelector(".abbr[data-fill=\"" + fill + "\"]");
+                    provinces[row] = {
+                        name: row.querySelector(".prov-name").textContent,
+                        is_sc: row.querySelector(".prov-sc").textContent != "None",
+                        home_sc: powerNameElem ? powerNameElem.value : "",
+                    }
+                }
+
+                let meta = {
+                    name: document.getElementById("map-name").value,
+                    author: document.getElementById("map-author").value,
+                    
+                    powers: powers,
+                    starting_state: starting_state,
+                    provinces: provinces,
+
+                    data: {
+                        land_color: document.getElementById("map-land-color").value,
+                        id: Math.random().toString(36).slice(2)
+                    }
+                }
+
+                let zip = new JSZip();
+                zip.file("meta.json", JSON.stringify(meta));
+                zip.file("map.svg", mapSrc);
+                zip.file("adj.json", JSON.stringify(adjData));
+                zip.file("pos.json", JSON.stringify(posData));
+                zip.generateAsync({type:"base64", compression: "DEFLATE", compressionOption : { level: 2 }})
+                    .then(function(base64) {
+                        let a = document.createElement("a");
+                        a.href = "data:application/zip;base64," + base64;
+                        a.download = meta.name.replace(/[^A-Za-z0-9]+/g, "-") + ".radv.zip";
+                        a.click();
+                    });
+            }
         </script>
         <!-- } -->
     </body>

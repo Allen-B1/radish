@@ -3,33 +3,30 @@ use std::{collections::{HashMap, HashSet}, error::Error, fmt::Debug};
 
 use base64::{prelude::BASE64_STANDARD, Engine};
 use dashmap::DashMap;
+use games::{Game, PosData};
 use google_auth_verifier::auth::{AuthVerifierClient, AuthenticationError};
-mod new_variant;
+
 use radip::{utils::{MapMeta, PowerMeta, ProvinceMeta}, Map, MapState, ProvinceAbbr, Unit};
-use rocket::{form::Form, fs::{FileServer, TempFile}, http::{Cookie, CookieJar}, response::{content::RawHtml, Redirect, Responder}, tokio::io::AsyncReadExt, State};
+use rocket::{form::Form, fs::{FileServer, TempFile}, http::{ContentType, Cookie, CookieJar, Status}, response::{content::RawHtml, Redirect, Responder}, serde::json::Json, tokio::io::AsyncReadExt, State};
+use nanoid::nanoid;
+
+mod games;
+
+fn gen_id() -> String{
+    nanoid!(16, &"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".chars().collect::<Vec<_>>())
+}
 
 struct AppState {
     pub users: DashMap<String, UserMeta>,
-    pub temp_variants: DashMap<String, TempVariant>,
     pub variants: DashMap<String, Variant>,
-}
-
-struct TempVariant {
-    pub name: String,
-
-    pub powers: HashMap<String, PowerMeta>,
-    pub starting_state: MapState,
-    pub home_sc: HashMap<ProvinceAbbr, String>,
-    pub provinces: HashMap<ProvinceAbbr, ProvinceMeta>,
-
-    pub adj: Map,
-    pub svg: String,
+    pub games: DashMap<String, Game>
 }
 
 struct Variant {
     pub adj: Map,
     pub svg: String,
     pub meta: MapMeta,
+    pub pos: PosData,
 }
 
 struct UserMeta {
@@ -85,12 +82,6 @@ fn signin() -> RawHtml<String> {
     RawHtml(SigninPage { user_name : "".to_string()}.render_string().unwrap())
 }
 
-
-#[get("/game/<id>")]
-fn game(id: &str) -> RawHtml<&'static str> {
-    RawHtml(include_str!("../pages/game.html"))
-}
-
 #[litem::template("pages/home.html")]
 pub struct HomePage {
     user_name: String,
@@ -120,34 +111,82 @@ struct ErrorPage<'a> {
 }
 
 #[get("/error?<msg>&<details>")]
-fn error_page(cookies: &CookieJar<'_>, state: &State<AppState>, msg: &str, details: Option<&str>) -> RawHtml<String> {
+fn error_page(cookies: &CookieJar<'_>, state: &State<AppState>, msg: Option<&str>, details: Option<&str>) -> RawHtml<String> {
     let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
     let name = state.users.get(token).map(|u| u.name.to_string()).unwrap_or("".to_string());
 
     RawHtml(ErrorPage {
         user_name: name,
-        msg: msg,
+        msg: msg.unwrap_or("Internal Error"),
         details: str::from_utf8(&BASE64_STANDARD.decode(details.unwrap_or("")).unwrap_or(vec![]))
             .unwrap_or("")
     }.render_string().unwrap())
 }
 
+
+ 
+#[litem::template("pages/create_variant.html")]
+struct CreateVariantPage {  
+    user_name: String,
+}
+
+
+#[get("/variants/create")]
+pub fn create_variant_page(cookies: &CookieJar<'_>, state: &State<AppState>) -> RawHtml<String> {
+    let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
+    let user_name = state.users.get(token).map(|x| x.name.clone()).unwrap_or_else(String::new);
+
+    RawHtml(CreateVariantPage {
+        user_name
+    }.render_string().unwrap())
+}
+
+#[get("/variants/<id>/map.svg")]
+pub fn variant_svg(state: &State<AppState>, id: &str) -> Result<(ContentType, String), Status> {
+    let variant = state.variants.get(id).ok_or(Status::NotFound)?;
+    Ok((ContentType::SVG, variant.svg.clone()))
+}
+
+#[get("/variants/<id>/adj.json")]
+pub fn variant_adj(state: &State<AppState>, id: &str) -> Result<Json<Map>, Status> {
+    let variant = state.variants.get(id).ok_or(Status::NotFound)?;
+    Ok(Json(variant.adj.clone()))
+}
+
+#[get("/variants/<id>/pos.json")]
+pub fn variant_pos(state: &State<AppState>, id: &str) -> Result<Json<PosData>, Status> {
+    let variant = state.variants.get(id).ok_or(Status::NotFound)?;
+    Ok(Json(variant.pos.clone()))
+}
+
+#[get("/variants/<id>/meta.json")]
+pub fn variant_meta(state: &State<AppState>, id: &str) -> Result<Json<MapMeta>, Status> {
+    let variant = state.variants.get(id).ok_or(Status::NotFound)?;
+    Ok(Json(variant.meta.clone()))
+}
+
+
 #[shuttle_runtime::main]
 async fn rocket() -> shuttle_rocket::ShuttleRocket {
     let rocket = rocket::build().mount("/", routes![
-        game,
         signin,
         auth,
         home,
         error_page,
 
-        new_variant::create_variant_page
+        games::create_game_page,
+        games::create_game_submit,
+        games::game,
+        games::game_meta,
+
+        variant_adj, variant_svg, variant_pos, variant_meta,
+        create_variant_page
     ])
     .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {
             users: DashMap::new(),
-            temp_variants: DashMap::new(),
-            variants: DashMap::new()
+            variants: DashMap::new(),
+            games: DashMap::new()
         });
 
     Ok(rocket.into())
