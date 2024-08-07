@@ -39,6 +39,11 @@
     let current_orders: Orders = {};
 
     $: {
+        active_phase;
+        active_prov = active_prov2 = null;
+    }
+
+    $: {
         let all = document.querySelectorAll(".prov-active");
         for (let elem of all) elem.classList.remove("prov-active");
 
@@ -659,11 +664,12 @@
 </div>
 
 {#if active_phase}
+{@const year = Number(active_phase.split("-")[1])}
 <div class="panel" id="phase-panel">
     <button on:click={() => { if (active_phase) active_phase = prevPhase(active_phase) }}>&lt;</button>
     <div style="display:flex;flex-direction:column;justify-content:center">
         <div id="phase">
-            {PHASES[active_phase.split("-")[0]]} {active_phase.split("-")[1]}
+            {PHASES[active_phase.split("-")[0]]} {"'" + (year < 10 ? "0" + year : year)}
         </div>
         {#if active_phase == current_phase}
         <div id="adj-time">{formatDuration(adjTime - nowDate)} left</div>
