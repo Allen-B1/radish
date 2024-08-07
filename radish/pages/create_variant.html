@@ -391,15 +391,16 @@
 
                     let unitsElem =row.querySelector(".units");
                     for (let unitStr of unitsElem.textContent.split(",")) {
-                        if (unitStr[0] == "A") {
-                            starting_state.units[unitStr[1]] = {
+                        let parts = unitStr.trim().split(" ").filter(Boolean);
+                        if (parts[0] == "A") {
+                            starting_state.units[parts[1]] = {
                                 "type": "army",
                                 "data": abbr
                             };
                         } else {
-                            starting_state.units[unitStr[1]] = {
+                            starting_state.units[parts[1]] = {
                                 "type": "fleet",
-                                "data": [abbr, unitStr[2] ? unitStr[2].slice(1, -1) : ""]
+                                "data": [abbr, parts[2] ? parts[2].slice(1, -1) : ""]
                             };
                         }
                     }
@@ -411,7 +412,7 @@
 
                     let fill = row.querySelector(".prov-sc").getAttribute("data-fill");
                     let powerNameElem = document.querySelector(".abbr[data-fill=\"" + fill + "\"]");
-                    provinces[row] = {
+                    provinces[abbr] = {
                         name: row.querySelector(".prov-name").textContent,
                         is_sc: row.querySelector(".prov-sc").textContent != "None",
                         home_sc: powerNameElem ? powerNameElem.value : "",

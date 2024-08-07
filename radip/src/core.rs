@@ -8,7 +8,7 @@ use crate::{base, Order};
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Core;
 
-#[typetag::serde]
+#[typetag::serde(name = "core")]
 impl Order for Core {
     fn deps(
             &self,

@@ -2,6 +2,8 @@
 //! These implementations follow Kruijswijk's specifications in [his excellent article](https://diplom.org/Zine/S2009M/Kruijswijk/DipMath_Chp2.htm)
 //! on adjudication.
 
+#![allow(unused_imports)]
+
 use crate::{FleetLoc, Map, MapState, Order, Orders, Province, ProvinceAbbr, Unit};
 use serde::{Deserialize, Serialize};
 use std::{
@@ -55,7 +57,7 @@ pub fn is_dislodged(
     }
 }
 
-#[typetag::serde]
+#[typetag::serde(name = "hold")]
 impl Order for Hold {
     fn deps(
         &self,
@@ -135,7 +137,7 @@ pub struct Bounds {
     pub max: u32,
 }
 
-#[typetag::serde]
+#[typetag::serde(name="move")]
 impl Order for Move {
     fn deps(
         &self,
@@ -353,7 +355,7 @@ pub fn is_untapped(
     }
 }
 
-#[typetag::serde]
+#[typetag::serde(name="support_hold")]
 impl Order for SupportHold {
     fn deps(
         &self,
@@ -426,7 +428,7 @@ fn unit_can_reach(map: &Map, state: &MapState, src: &str, dest: &str) -> bool {
     }
 }
 
-#[typetag::serde]
+#[typetag::serde(name="support_move")]
 impl Order for SupportMove {
     fn deps(
         &self,
@@ -484,7 +486,7 @@ pub struct Convoy {
     pub dest: ProvinceAbbr,
 }
 
-#[typetag::serde]
+#[typetag::serde(name="convoy")]
 impl Order for Convoy {
     fn deps(
         &self,

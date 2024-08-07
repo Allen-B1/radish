@@ -1,8 +1,8 @@
-use std::{collections::{HashMap, HashSet}, hash::Hash, io::{Cursor, Read}, time::{SystemTime, UNIX_EPOCH}};
+use std::{collections::{HashMap, HashSet}, future::pending, hash::Hash, io::{Cursor, Read}, time::{SystemTime, UNIX_EPOCH}};
 use rand::prelude::*;
 use radip::{adjudicate, base::{Hold, Move}, utils::{apply_adjudication, MapMeta, RetreatOptions}, Map, MapState, Orders, ProvinceAbbr, Unit};
 use rocket::{build, form::Form, fs::{NamedFile, TempFile}, futures::{SinkExt, StreamExt}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, tokio::{io::AsyncReadExt, select, sync::broadcast, time::{Duration, Instant}}, State};
-use tokio::time;
+use tokio::{sync::broadcast::error::RecvError, time};
 use ws::{stream::DuplexStream, Message};
 
 use crate::{encode_error, gen_id, AppState, HeadComponent, HeaderComponent, Variant};
@@ -20,6 +20,79 @@ pub fn create_game_page(cookies: &CookieJar<'_>, state: &State<AppState>) -> Res
     Ok(RawHtml(CreateGamePage {
         user_name: user.name.clone()
     }.render_string().unwrap()))
+}
+
+#[post("/games/new/submit", data = "<form>")]
+pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>, form: Form<CreateGameForm<'_>>) -> Result<Redirect, Redirect> {
+    let form = form.into_inner();
+    let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
+    let user = state.users.get(token).ok_or(Redirect::to("/signin"))?;
+
+    let mut buf: Vec<u8> = vec![];
+    form.variant.open().await
+        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?
+        .read_to_end(&mut buf).await
+        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?;
+
+    let mut zip  = zip::ZipArchive::new(Cursor::new(buf))
+        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?;
+
+    let meta: MapMeta = serde_json::from_reader(zip.by_name("meta.json")
+        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
+        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
+
+    let variant_id = meta.data.get("id").and_then(|v| v.as_str())
+        .ok_or(Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error("missing id".to_string()))))?;
+
+    if !state.variants.contains_key(variant_id) {
+        let mut map = String::new();
+        zip.by_name("map.svg")
+            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", e)))?
+            .read_to_string(&mut map)
+            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", e)))?;
+
+        let adj: Map = serde_json::from_reader(zip.by_name("adj.json")
+            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
+            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
+
+        let pos: PosData =  serde_json::from_reader(zip.by_name("pos.json")
+        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
+        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
+
+        state.variants.insert(variant_id.to_string(), Variant {
+            adj: adj,
+            svg: map,
+            meta: meta.clone(),
+            pos: pos,
+        });
+    }
+
+    let (sender, _) = broadcast::channel(16);
+
+    let game_id = gen_id();
+    state.games.insert(game_id.clone(), Game {
+        meta: GameMeta {
+            name: form.name,
+            press: form.press,
+            end_year: form.end_year,
+
+            variant: variant_id.to_string(),
+
+            time_build: match form.time_build_unit {
+                TimeUnit::Min => Duration::from_secs(60*form.time_build as u64),
+                TimeUnit::Hr => Duration::from_secs(60*60*form.time_build as u64)
+            },
+            time_mvmt: match form.time_mvmt_unit {
+                TimeUnit::Min => Duration::from_secs(60*form.time_mvmt  as u64),
+                TimeUnit::Hr => Duration::from_secs(60*60*form.time_mvmt  as u64)
+            }
+        },
+        broadcast: sender,
+        player_broadcast: HashMap::new(),
+        state: None
+    });
+
+    Ok(Redirect::to(format!("/games/{}", game_id)))
 }
 
 #[derive(FromFormField, Serialize, Deserialize, Clone)]
@@ -77,7 +150,7 @@ pub struct GameMeta {
     pub variant: String,
 }
 
-#[derive(Clone, Serialize, Deserialize, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Serialize, Debug, Deserialize, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all="snake_case")]
 pub enum GamePhase {
     Spring,
@@ -170,7 +243,7 @@ impl GameState {
 
 #[derive(Deserialize, Clone)]
 #[serde(rename_all="snake_case", tag = "type")]
-enum InMessage {
+pub enum InMessage {
     Auth { token: String },
     Orders { orders: Orders },
     Builds { builds: Builds }
@@ -178,9 +251,19 @@ enum InMessage {
 
 #[derive(Serialize, Clone)]
 #[serde(rename_all="snake_case", tag = "type")]
-enum OutMessage {
+pub enum OutMessage {
     Error { msg : String },
-    UpdatePlayers { players: HashSet<String> },
+    UpdatePlayers { players: Vec<(String, String)> },
+
+    GameInfo {
+        power: String,
+    },
+
+    MapState {
+        year: u8,
+        phase: GamePhase,
+        state: MapState
+    },
 
     Phase {
         year: u8,
@@ -213,81 +296,8 @@ enum OutMessage {
 pub struct Game {
     pub meta: GameMeta,
     pub broadcast: broadcast::Sender<OutMessage>,
-    pub players: HashSet<String>,
+    pub player_broadcast: HashMap<String, broadcast::Sender<OutMessage>>,
     pub state: Option<GameState>
-}
-
-#[post("/games/new/submit", data = "<form>")]
-pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>, form: Form<CreateGameForm<'_>>) -> Result<Redirect, Redirect> {
-    let form = form.into_inner();
-    let token = cookies.get("token").map(|c| c.value()).unwrap_or("");
-    let user = state.users.get(token).ok_or(Redirect::to("/signin"))?;
-
-    let mut buf: Vec<u8> = vec![];
-    form.variant.open().await
-        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?
-        .read_to_end(&mut buf).await
-        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?;
-
-    let mut zip  = zip::ZipArchive::new(Cursor::new(buf))
-        .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?;
-
-    let meta: MapMeta = serde_json::from_reader(zip.by_name("meta.json")
-        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
-        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
-
-    let variant_id = meta.data.get("id").and_then(|v| v.as_str())
-        .ok_or(Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error("missing id".to_string()))))?;
-
-    if !state.variants.contains_key(variant_id) {
-        let mut map = String::new();
-        zip.by_name("map.svg")
-            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", e)))?
-            .read_to_string(&mut map)
-            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", e)))?;
-
-        let adj: Map = serde_json::from_reader(zip.by_name("adj.json")
-            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
-            .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
-
-        let pos: PosData =  serde_json::from_reader(zip.by_name("pos.json")
-        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
-        .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
-
-        state.variants.insert(variant_id.to_string(), Variant {
-            adj: adj,
-            svg: map,
-            meta: meta.clone(),
-            pos: pos,
-        });
-    }
-
-    let (sender, _) = broadcast::channel(16);
-
-    let game_id = gen_id();
-    state.games.insert(game_id.clone(), Game {
-        meta: GameMeta {
-            name: form.name,
-            press: form.press,
-            end_year: form.end_year,
-
-            variant: variant_id.to_string(),
-
-            time_build: match form.time_build_unit {
-                TimeUnit::Min => Duration::from_secs(60*form.time_build as u64),
-                TimeUnit::Hr => Duration::from_secs(60*60*form.time_build as u64)
-            },
-            time_mvmt: match form.time_mvmt_unit {
-                TimeUnit::Min => Duration::from_secs(60*form.time_mvmt  as u64),
-                TimeUnit::Hr => Duration::from_secs(60*60*form.time_mvmt  as u64)
-            }
-        },
-        broadcast: sender,
-        players: HashSet::from([token.to_string()]),
-        state: None
-    });
-
-    Ok(Redirect::to(format!("/games/{}", game_id)))
 }
 
 
@@ -305,6 +315,10 @@ pub fn game_meta(state: &State<AppState>, id: &str) -> Result<Json<GameMeta>, St
 /// While this thread runs,
 /// the game at `game_id` should exist.
 async fn game_thread(state: AppState, game_id: String) {
+    // initialize game
+    // - decide powers
+    // - set state to Some
+    // - send broadcast messages
     {
         let mut game = state.games.get_mut(&game_id).unwrap();
         let variant = state.variants.get(&game.meta.variant).unwrap();
@@ -313,13 +327,23 @@ async fn game_thread(state: AppState, game_id: String) {
         let mut powers = variant.meta.powers.keys().map(|x| x.clone()).collect::<Vec<String>>();
         powers.shuffle(&mut thread_rng());
 
-        for player in game.players.iter() {
+        for player in game.player_broadcast.keys() {
             players.insert(player.clone(), powers.pop().unwrap());
+        }
+
+        game.broadcast.send(OutMessage::UpdatePlayers {
+            players: players.iter().map(|(t,pwr)| (pwr.to_string(), state.users.get(t).map(|c| c.name.to_string()).unwrap_or("".to_string()))).collect() 
+        });
+
+        for (player, power) in players.iter() {
+            game.player_broadcast[player].send(OutMessage::GameInfo { 
+                power: power.to_string()
+            });
         }
 
         game.state = Some(GameState {
             year: 1,
-            phase: GamePhase::Fall,
+            phase: GamePhase::Spring,
             adj_time: adj_time,
 
             states: HashMap::from([((1, GamePhase::Spring), variant.meta.starting_state.clone())]),
@@ -335,7 +359,18 @@ async fn game_thread(state: AppState, game_id: String) {
     }
 
     loop {
-        let game = state.games.get_mut(&game_id).unwrap();
+        let mut game = state.games.get_mut(&game_id).unwrap();
+
+        let gstate = game.state.as_ref().unwrap();
+        let new_adj_time = Instant::now() + match gstate.phase.is_move() {
+            true => game.meta.time_mvmt,
+            false => game.meta.time_build
+        };
+
+        let gstate = game.state.as_mut().unwrap();
+        gstate.adj_time = new_adj_time;
+        drop(gstate);
+
         let gstate = game.state.as_ref().unwrap();
         let epoch = Instant::now() - (SystemTime::now().duration_since(std::time::UNIX_EPOCH)).expect("unable to get system time");
         game.broadcast.send(OutMessage::Phase {
@@ -351,6 +386,7 @@ async fn game_thread(state: AppState, game_id: String) {
         let mut game = state.games.get_mut(&game_id).unwrap();
         let variant = state.variants.get(&game.meta.variant).unwrap();
         let gstate = game.state.as_ref().unwrap();
+        println!("adjudicating {:?} {}", gstate.phase, gstate.year);
 
         // sanitize orders
         if gstate.phase.is_move() {
@@ -363,7 +399,7 @@ async fn game_thread(state: AppState, game_id: String) {
             drop(orders);
             drop(gstate);
         }
-        
+         
         let gstate = game.state.as_ref().unwrap();
         if gstate.phase.is_move() {
             let orders = gstate.current_orders();
@@ -456,51 +492,115 @@ async fn game_thread(state: AppState, game_id: String) {
     }
 }
 
-async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, msg: InMessage, stream: &mut DuplexStream) -> Result<(), ()> {
-    let mut send = |msg: OutMessage| {
-        stream.send(Message::Text(serde_json::to_string(&msg).unwrap()));
+async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, player_broadcast: &mut Option<broadcast::Receiver<OutMessage>>, msg: InMessage, stream: &mut DuplexStream) -> Result<(), ()> {
+    async fn send(stream: &mut DuplexStream, msg: OutMessage) {
+        stream.send(Message::Text(serde_json::to_string(&msg).unwrap())).await;
     };
 
     match msg {
         InMessage::Auth { token: tok } => {
-            if state.users.contains_key(&tok) {
-                let mut game = state.games.get_mut(game_id).ok_or(())?;   
-                game.players.insert(tok.clone());
-                game.broadcast.send(OutMessage::UpdatePlayers { players: game.players.clone() });
+            println!("player joined");
 
-                let variant = state.variants.get(&game.meta.variant).unwrap();
-                if game.players.len() == variant.meta.powers.len() {
-                    // start game
-                    let state_clone = state.clone();
-                    let game_id_clone = game_id.to_string();
-                    tokio::spawn(async move {
-                        game_thread(state_clone, game_id_clone)
-                    });
+            let game = state.games.get(game_id).ok_or(())?;   
+            if state.users.contains_key(&tok) && game.state.is_none() {
+                drop(game);
+                let mut game = state.games.get_mut(game_id).ok_or(())?;   
+                if !game.player_broadcast.contains_key(&tok) {
+                    let (send, _) = broadcast::channel(16);
+                    game.player_broadcast.insert(tok.clone(), send);
+                    _ = game.broadcast.send(OutMessage::UpdatePlayers { players: game.player_broadcast.keys().map(|id| state.users.get(id).map(|p| p.name.clone()).unwrap_or("".to_string())).map(|n| ("".to_string(), n.to_string())).collect() });    
+
+                    let variant = state.variants.get(&game.meta.variant).unwrap();
+                    if game.player_broadcast.len() == variant.meta.powers.len() {
+                        // start game
+                        let state_clone = state.clone();
+                        let game_id_clone = game_id.to_string();
+                        tokio::spawn(async move {
+                            game_thread(state_clone, game_id_clone).await
+                        });
+                    }
                 }
 
-                *token = tok;
+                *player_broadcast = Some(game.player_broadcast[&tok].subscribe());
+            }
+            *token = tok;
+
+            // send starting information
+            if let Some(game) = state.games.get(game_id) {
+                println!("sending starting info...");
+                if let Some(gstate) = &game.state {
+                    for (&(year, phase), state) in gstate.states.iter() {
+                        send(stream, OutMessage::MapState {
+                            year, phase, state: state.clone()
+                        }).await;
+                    }
+                    for (&(year, phase), orders) in gstate.orders.iter() {
+                        if (year, phase) == (gstate.year, gstate.phase) {
+                            continue
+                        }
+                        if phase.is_move() {
+                            send(stream, OutMessage::MovementAdj {
+                                year, phase,
+                                orders: orders.clone(),
+                                order_status: gstate.mvmt_info[&(year, phase)].order_status.clone(),
+                                retreats: gstate.mvmt_info[&(year, phase)].retreats.clone()
+                            }).await;
+                        } else if phase.is_retreat() {
+                            send(stream, OutMessage::RetreatAdj {
+                                year, phase,
+                                orders: orders.clone()
+                            }).await;
+                        }
+                    }
+                    for (&(year, phase), builds) in gstate.builds.iter() {
+                        if (year, phase) == (gstate.year, gstate.phase) {
+                            continue
+                        }
+                        send(stream, OutMessage::BuildAdj { year, phase, builds: builds.clone() }).await;
+                    }
+
+                    let epoch = Instant::now() - (SystemTime::now().duration_since(std::time::UNIX_EPOCH)).expect("unable to get system time");
+
+                    send(stream, OutMessage::GameInfo { power: gstate.players.get(token).map(|s| s.as_str()).unwrap_or("").to_string() }).await;
+                    send(stream, OutMessage::Phase {
+                        phase: gstate.phase, year: gstate.year,
+                        adj_time: gstate.adj_time.duration_since(epoch).as_millis() as u64, state: gstate.current_state().clone()
+                    }).await;
+                    send(stream, OutMessage::UpdatePlayers {
+                        players: gstate.players.iter().map(|(tok, pwr)| (pwr.to_string(), state.users.get(tok).unwrap().name.to_string())).collect()
+                    }).await;
+                }
+
+                println!("done sending starting info");
+
+                drop(game);
             }
         },
         InMessage::Builds { builds } => {
             let mut game = state.games.get_mut(game_id).ok_or(())?;   
             if game.state.is_none() {
-                send(OutMessage::Error { msg: "Game not started".to_string() });
+                send(stream, OutMessage::Error { msg: "Game not started".to_string() }).await;
                 return Ok(())
             }
-            if !state.users.contains_key(token) || !game.players.contains(token) {
-                send(OutMessage::Error { msg: "Not authenticated".to_string() });
+            if !state.users.contains_key(token) || !game.player_broadcast.contains_key(token) {
+                send(stream, OutMessage::Error { msg: "Not authenticated".to_string() }).await;
                 return Ok(())
             }
 
             let gstate = game.state.as_mut().unwrap();
+            if !gstate.phase.is_build() {
+                send(stream, OutMessage::Error { msg: "Not a build phase".to_string() }).await;
+                return Ok(())
+            }
+
             let power = &gstate.players[&*token];
             for (prov, unit) in builds {
                 if gstate.current_state().units.contains_key(&prov) {
-                    send(OutMessage::Error { msg: format!("Build location {} is occupied", &prov) });
+                    send(stream, OutMessage::Error { msg: format!("Build location {} is occupied", &prov) }).await;
                     return Ok(())           
                 }
                 if gstate.current_state().ownership.get(&prov) != Some(&unit.nationality()) || unit.nationality() != *power {
-                    send(OutMessage::Error { msg: format!("Build location {} is not owned by you", &prov) });
+                    send(stream, OutMessage::Error { msg: format!("Build location {} is not owned by you", &prov) }).await;
                     return Ok(())
                 }
 
@@ -511,16 +611,33 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
         InMessage::Orders { orders } => {
             let mut game = state.games.get_mut(game_id).ok_or(())?;   
             if game.state.is_none() {
-                send(OutMessage::Error { msg: "Game not started".to_string() });
+                send(stream, OutMessage::Error { msg: "Game not started".to_string() }).await;
                 return Ok(())
             }
-            if !state.users.contains_key(token) || !game.players.contains(token) {
-                send(OutMessage::Error { msg: "Not authenticated".to_string() });
+            if !state.users.contains_key(token) || !game.player_broadcast.contains_key(token) {
+                send(stream, OutMessage::Error { msg: "Not authenticated".to_string() }).await;
                 return Ok(())
             }
 
             let gstate = game.state.as_mut().unwrap();
-            let power = &gstate.players[&*token];
+            if gstate.phase.is_build() {
+                send(stream, OutMessage::Error { msg: "Not a build phase".to_string() }).await;
+                return Ok(())
+            }
+
+            if !gstate.players.contains_key(token) {
+                send(stream, OutMessage::Error { msg: "You are not in this game".to_string() }).await;
+                return Ok(())
+            }
+
+            // authenticate 
+            for (prov, order) in orders.iter() {
+                let power = gstate.players[token].as_str();
+                if gstate.current_state().units.get(prov).map(|u| u.nationality()).unwrap_or("".to_string()) != power {       
+                    send(stream, OutMessage::Error { msg: format!("Invalid orderset: you do not have a unit at {}", prov) }).await;
+                    return Ok(())
+                }
+            }
 
             gstate.current_orders_mut().extend(orders);
         }
@@ -540,6 +657,8 @@ pub fn game_stream(state: &State<AppState>, id: &str, ws: ws::WebSocket) -> Resu
 
     Ok(ws.channel(move |mut stream| Box::pin(async move {
         let mut token = String::new();
+        let mut player_broadcast: Option<broadcast::Receiver<OutMessage>> = None;
+
         loop {
             select! {
                 message = stream.next() => {
@@ -553,7 +672,7 @@ pub fn game_stream(state: &State<AppState>, id: &str, ws: ws::WebSocket) -> Resu
                                 Err(err) => { eprintln!("{:?}", err); continue }
                             };
                             
-                            handle_in_message(&state, &id, &mut token, msg, &mut stream).await;
+                            let _ = handle_in_message(&state, &id, &mut token, &mut player_broadcast, msg, &mut stream).await;
                         },
                         Message::Ping(data) => {
                             stream.send(Message::Pong(data)).await?;
@@ -563,6 +682,16 @@ pub fn game_stream(state: &State<AppState>, id: &str, ws: ws::WebSocket) -> Resu
                 },
 
                 Ok(message) = broadcast.recv() => {
+                    stream.send(Message::Text(serde_json::to_string(&message).unwrap_or_else(|e| format!("error: {:?}", e)))).await?;
+                },
+
+                Ok(message) = async {
+                    if let Some(br) = &mut player_broadcast {
+                        br.recv().await
+                    } else {
+                        pending().await
+                    }
+                }  => {
                     stream.send(Message::Text(serde_json::to_string(&message).unwrap_or_else(|e| format!("error: {:?}", e)))).await?;
                 }
             }

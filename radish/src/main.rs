@@ -186,7 +186,7 @@ async fn rocket() -> shuttle_rocket::ShuttleRocket {
     ])
     .mount("/static", FileServer::from(env!("CARGO_MANIFEST_DIR").to_owned() + "/static"))
         .manage(AppState {
-            users: Arc::new(DashMap::new()),
+            users: Arc::new(DashMap::from_iter(["Apple", "Banana", "Celery", "Dune", "Eel", "Fruit"].map(|c| (c.chars().next().unwrap().to_ascii_lowercase().to_string(), UserMeta { name: c.to_string() })))),
             variants: Arc::new(DashMap::new()),
             games: Arc::new(DashMap::new())
         });
