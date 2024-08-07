@@ -108,10 +108,12 @@ pub fn apply_adjudication(map: &Map, state: &MapState, orders: &Orders, order_st
 }
 
 
-pub fn count_units(map: &Map, state: &MapState, power: &str) -> usize {
+/// Returns the number of units the given power has on the board.
+pub fn count_units(state: &MapState, power: &str) -> usize {
     return state.units.values().filter(|u| u.nationality() == power).count();
 }
 
-pub fn count_supply(map: &Map, state: &MapState, power: &str) -> usize {
+/// Returns the SC count of the given power.
+pub fn count_supply(state: &MapState, power: &str) -> usize {
     return state.ownership.values().filter(|u| *u == power).count();
 }

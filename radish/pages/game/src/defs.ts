@@ -130,7 +130,11 @@ export function prevNonemptyPhase(gp: GamePhaseYear, all_mvmt_info: Record<GameP
 
 export type PressType = "full" | "rulebook" | "public" | "gunboat";
 
-export type Builds = Record<string, Unit>;
+export type Build = 
+    { type : "disband" } | 
+    { type : "fleet", coast: string } |
+    { type : "army" };
+export type Builds = Record<string, Build>;
 
 export interface MvmtInfo {
     order_status: Record<string, boolean>,

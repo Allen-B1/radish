@@ -1,6 +1,6 @@
 use std::{collections::{HashMap, HashSet}, future::pending, hash::Hash, io::{Cursor, Read}, time::{SystemTime, UNIX_EPOCH}};
 use rand::prelude::*;
-use radip::{adjudicate, base::{Hold, Move}, utils::{apply_adjudication, MapMeta, RetreatOptions}, Map, MapState, Orders, ProvinceAbbr, Unit};
+use radip::{adjudicate, base::{self, Hold, Move}, utils::{apply_adjudication, count_supply, count_units, MapMeta, RetreatOptions}, Map, MapState, Orders, ProvinceAbbr, Unit};
 use rocket::{build, form::Form, fs::{NamedFile, TempFile}, futures::{SinkExt, StreamExt}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, tokio::{io::AsyncReadExt, select, sync::broadcast, time::{Duration, Instant}}, State};
 use tokio::{sync::broadcast::error::RecvError, time};
 use ws::{stream::DuplexStream, Message};
@@ -206,7 +206,15 @@ pub struct MvmtPhaseInfo {
     retreats: HashMap<String, RetreatOptions>
 }
 
-type Builds = HashMap<String, Unit>;
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(tag = "type", content="coast", rename_all="snake_case")]
+pub enum Build {
+    Disband,
+    Fleet(String),
+    Army
+}
+
+type Builds = HashMap<String, Build>;
 
 pub struct GameState {
     /// For each phase, this exists on phase start.
@@ -289,7 +297,7 @@ pub enum OutMessage {
     BuildAdj {
         year: u8,
         phase: GamePhase,
-        builds: HashMap<String, Unit>,
+        builds: Builds
     }
 }
 
@@ -459,9 +467,19 @@ async fn game_thread(state: AppState, game_id: String) {
             for (prov, units) in retreat_units {
                 if units.len() == 1 {
                     new_mstate.units.insert(prov, units.into_iter().next().unwrap());
-                }
+                } 
             }
 
+            let gstate = game.state.as_mut().unwrap();
+            let mvmt_info = gstate.mvmt_info.get(&(gstate.year, gstate.phase.mvmt())).unwrap();
+            let orders = gstate.orders.get_mut(&(gstate.year, gstate.phase)).unwrap();
+            for (prov, _) in mvmt_info.retreats.iter() {
+                if !orders.contains_key(prov) {
+                    orders.insert(prov.to_string(), Box::new(base::Hold));
+                }
+            }
+            
+            let gstate = game.state.as_ref().unwrap();
             game.broadcast.send(OutMessage::RetreatAdj { 
                 year: gstate.year,
                 phase: gstate.phase,
@@ -487,9 +505,19 @@ async fn game_thread(state: AppState, game_id: String) {
             let mut new_mstate = gstate.current_state().clone();
             let builds  =HashMap::new();
             let builds = gstate.builds.get(&(gstate.year, gstate.phase.mvmt())).unwrap_or(&builds);
-            for (prov, build) in builds {
-                new_mstate.units.insert(prov.to_string(), build.clone());
+            for (prov, build) in builds.iter() {
+                let power = match new_mstate.ownership.get(prov) {
+                    Some(power) => power,
+                    None => continue
+                };
+                match build {
+                    Build::Army => new_mstate.units.insert(prov.to_string(), Unit::Army(power.to_string())),
+                    Build::Fleet(coast) => new_mstate.units.insert(prov.to_string(), Unit::Fleet(power.to_string(), coast.to_string())),
+                    Build::Disband => new_mstate.units.remove(prov)
+                };
             }
+
+            // TODO: check supply count
 
             game.broadcast.send(OutMessage::BuildAdj { 
                 year: gstate.year,
@@ -613,18 +641,33 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
             }
 
             let power = &gstate.players[&*token];
-            for (prov, unit) in builds {
+            for (prov, build) in builds {
                 if gstate.current_state().units.contains_key(&prov) {
                     send(stream, OutMessage::Error { msg: format!("Build location {} is occupied", &prov) }).await;
                     return Ok(())           
                 }
-                if gstate.current_state().ownership.get(&prov) != Some(&unit.nationality()) || unit.nationality() != *power {
+                if gstate.current_state().ownership.get(&prov) != Some(power) {
                     send(stream, OutMessage::Error { msg: format!("Build location {} is not owned by you", &prov) }).await;
                     return Ok(())
                 }
 
+                let mstate = gstate.current_state();
+                let supply = count_supply(mstate, power);
+                let units = count_units(mstate, power);
+                match &build {
+                    Build::Disband => if !(supply < units) {
+                        send(stream, OutMessage::Error { msg: format!("No disbands; can't disband {}", &prov) }).await;
+                    },
+                    Build::Army => if !(supply > units) {
+                        send(stream, OutMessage::Error { msg: format!("No builds; can't build A {}", &prov) }).await;
+                    },
+                    Build::Fleet(_) => if !(supply > units) {
+                        send(stream, OutMessage::Error { msg: format!("No builds; can't build F {}", &prov) }).await;
+                    },
+                }
+
                 let builds = gstate.builds.entry((gstate.year, gstate.phase)).or_insert(HashMap::new());
-                builds.insert(prov, unit);
+                builds.insert(prov, build);
             }
         },
         InMessage::Orders { orders } => {
@@ -660,20 +703,29 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
                 }
             } else {
                 let power = gstate.players[token].as_str();
-                for (prov, order) in orders.iter() {
-                    let mov = match order.downcast_ref::<Move>() {
-                        Some(mov) => mov,
-                        None => {
-                            send(stream, OutMessage::Error { msg: format!("Invalid orderset: only move orders allowed during adjudication") }).await;
-                            return Ok(())    
-                        }
-                    };
-
+                for (prov, order) in orders.iter() {                    
                     let info = match  gstate.mvmt_info.get(&(gstate.year, gstate.phase.mvmt())) {
                         Some(info) => info,
                         None => {
                             send(stream, OutMessage::Error { msg: format!("Movement info not found") }).await;
                             return Ok(())    
+                        }
+                    };
+
+                    let mov = match order.downcast_ref::<Move>() {
+                        Some(mov) => mov,
+                        None => {
+                            if !order.is::<Hold>() {
+                                send(stream, OutMessage::Error { msg: format!("Invalid orderset: only move orders allowed during retreat") }).await;
+                                return Ok(())
+                            }
+
+                            if info.retreats.get(prov).is_none() || info.retreats[prov].src.nationality() != power {
+                                send(stream, OutMessage::Error {  msg: format!("Can't disband {}", prov) }).await;
+                                return Ok(())
+                            }
+
+                            continue
                         }
                     };
 

@@ -36,7 +36,9 @@
     let active_prov: string | null = null;
     let active_prov2: string | null = null;
     let order_mode: "move" | "convoy" | "support" = "move";
+
     let current_orders: Orders = {};
+    let current_builds: Builds = {};
 
     $: {
         active_phase;
@@ -74,10 +76,57 @@
         }
     }
 
-    let active_orders: Readonly<Orders> = current_orders;
-    $: {
-        active_orders = active_phase == current_phase ? current_orders : ((active_phase && all_orders[active_phase]) || {});
+    function createDisband(x: number, y: number) : SVGElement {
+        x = x / posData.width;
+        y = y / posData.width;
+        let r = 16 / posData.width;
+
+        let g = document.createElementNS(SVG_SPEC, "g");
+        g.innerHTML = `
+            <line x1=${computeX(x - r)} x2=${computeX(x + r)} y1=${computeX(y - r)} y2=${computeX(y + r)} />
+            <line x1=${computeX(x + r)} x2=${computeX(x - r)} y1=${computeX(y - r)} y2=${computeX(y + r)} />
+        `;
+        g.classList.add("disband");
+        svgElem.appendChild(g);
+        return g;
     }
+
+    let active_builds: Readonly<Builds> = current_builds;
+    $: active_builds = active_phase == current_phase ? current_builds : ((active_phase && all_builds[active_phase]) || {});
+    // draw builds
+    $: {
+        document.querySelectorAll(".build").forEach(n => n.remove());
+        document.querySelectorAll(".disband-build").forEach(n => n.remove());
+
+        let ownership = active_phase && all_states[active_phase] &&  all_states[active_phase].ownership;
+        if (ownership) for (let prov in active_builds) {
+            let build = active_builds[prov];
+            let loc = prov + ("coast" in build && build.coast ? "-" + build.coast : "");
+            let pos = posData.provinces[loc];
+
+            switch (build.type) {
+            case "disband": {
+                createDisband(pos.x, pos.y).classList.add("disband-build");
+                break;
+            }
+            case "army": {
+                let unit = createUnit("army", ownership[prov], pos.x, pos.y);
+                unit.classList.remove("unit");
+                unit.classList.add("build");
+                break;
+            }
+            case "fleet": {
+                let unit = createUnit("fleet", ownership[prov], pos.x, pos.y);
+                unit.classList.remove("unit");
+                unit.classList.add("build");
+                break;
+            }
+            }
+        }
+    }
+
+    let active_orders: Readonly<Orders> = current_orders;
+    $: active_orders = active_phase == current_phase ? current_orders : ((active_phase && all_orders[active_phase]) || {});
     // draw orders
     $: {
         document.querySelectorAll(".order").forEach(n => n.remove());
@@ -156,6 +205,16 @@
                 break;
             }
             case "hold": {
+                if (active_phase && isRetreat(active_phase) && all_mvmt_info[prevPhase(active_phase)] && prov in all_mvmt_info[prevPhase(active_phase)].retreats) {
+                    let src = unitLoc(prov, all_mvmt_info[prevPhase(active_phase)].retreats[prov].src);
+                    let [x, y] = [posData.provinces[src].x, posData.provinces[src].y];
+                    if (all_states[active_phase].units[prov]) {
+                        x += 16; y += 8;
+                    }
+                    let disband = createDisband(x, y);
+                    disband.classList.add("order");
+                    break;
+                }
                 let src = unitLoc(prov);
                 let x1 = posData.provinces[src].x,
                     y1 = posData.provinces[src].y;
@@ -366,6 +425,9 @@
     $: if (ws != null && ws.readyState == WebSocket.OPEN) {
         ws.send(JSON.stringify({type : "orders", orders: current_orders}));
     }
+    $: if (ws != null && ws.readyState == WebSocket.OPEN) {
+        ws.send(JSON.stringify({type : "builds", builds: current_builds}));
+    }
 
     async function init() {
         let game_id = location.pathname.split("/")[2];
@@ -416,7 +478,9 @@
   </defs>`;
         var style=document.createElement("style");
         style.textContent = `
-        .order { stroke-width: ${4 * svgElem.viewBox.baseVal.width / posData.width} }
+        .build { stroke-dasharray: ${8 * svgElem.viewBox.baseVal.width / posData.width} !important;
+            stroke-width:  ${8 * svgElem.viewBox.baseVal.width / posData.width} !important; }
+        .order, .disband line { stroke-width: ${4 * svgElem.viewBox.baseVal.width / posData.width} !important; }
         .support { stroke-dasharray: ${4 * svgElem.viewBox.baseVal.width / posData.width} }
         .convoy { stroke-dasharray: ${16 * svgElem.viewBox.baseVal.width / posData.width} ${4 * svgElem.viewBox.baseVal.width / posData.width} }
         `;
@@ -447,6 +511,19 @@
                     tileElem = circleElem;
                 }
 
+                if (adjData.provinces[province].is_sea) {
+                    tileElem.classList.add("sea");
+                }
+                if (coast) {
+                    tileElem.classList.add("coast");
+                }
+                if (coast == "" && adjData.provinces[province].coasts.length != 0) {
+                    tileElem.classList.add("has-coast");
+                }
+                if (adjData.fleet_adj.find(c => c[0][0] == province) == null) {
+                    tileElem.classList.add("landlocked");
+                }
+
                 tileElem.addEventListener("click", (evt) => {
                     if (current_phase == null || current_phase != active_phase) {
                         return;
@@ -463,12 +540,14 @@
                             }
                         } else {
                             if (active_prov == province) {
+                                current_orders[active_prov] = { type: "hold" };   
                                 active_prov = active_prov2 = null;
                             } else if (retreatInfo[active_prov] && retreatInfo[active_prov].dest.filter(([p, c]) => p == province && c == coast).length != 0) {
                                 current_orders[active_prov] = {
                                     type: "move",
                                     dest: [province, coast]
                                 };   
+                                active_prov = null;
                             } else if (retreatInfo[active_prov]) {
                                 console.log(retreatInfo[active_prov].dest.filter(([p, c]) => p == province && c == coast), retreatInfo[active_prov].dest);
                             }
@@ -518,6 +597,29 @@
                             active_prov = active_prov2 = null;
                             order_mode = "move";
                         }
+                    } else if (isBuild(current_phase) && all_states[current_phase] && units) {
+                        let n_units = Object.values(units).filter(u => unitNatl(u) == mePower).length;
+                        let n_supply = Object.values(all_states[current_phase].ownership).filter(p => p == mePower).length;
+
+                        if (n_supply < n_units && units[province]) {
+                            if (!current_builds[province]) {
+                                current_builds[province] = { type: "disband" };
+                            } else {
+                                delete current_builds[province];
+                                current_builds = current_builds;
+                            }
+                        } else if (n_supply > n_units && !units[province] && all_states[current_phase].ownership[province] == mePower) {
+                            if (!current_builds[province]) {
+                                if (keydown.f) {
+                                    current_builds[province] = { type: "fleet", coast: coast };
+                                } else {
+                                    current_builds[province] = { type: "army" };
+                                }
+                            } else {
+                                delete current_builds[province];
+                                current_builds = current_builds;
+                            }
+                        }
                     }
                 });
             }
@@ -555,7 +657,7 @@
                 if (!active_phase) {
                     active_phase = phase;
                 }
-                current_orders = {};
+                current_orders = current_builds = {};
                 current_phase = phase;
                 adjTime = msg.adj_time;
                 break;
@@ -627,8 +729,16 @@
         filter: brightness(80%);
     }
     :global(.tile.prov-active-2) {
-        filter: brightness(80%) hue-rotate(90deg);
-    }
+        filter: brightness(80%) hue-rotate(90deg);  }
+
+    .build-army :global(.coast), .build-army :global(.sea), .build-fleet :global(.landlocked), .build-fleet :global(.has-coast),
+    .move-army :global(.coast), .move-army :global(.sea), .move-fleet :global(.landlocked), .move-fleet :global(.has-coast),
+    .no-touch :global(.tile), .move-none :global(.coast) {
+        pointer-events: none; }
+    .build-army :global(.coast.added), .build-army :global(.sea.added), .build-fleet :global(.landlocked.added), .build-fleet :global(.has-coast.added),
+    .move-army :global(.coast.added), .move-army :global(.sea.added), .move-fleet :global(.landlocked.added), .move-fleet :global(.has-coast.added),
+    .no-touch  :global(.tile.added), .move-none :global(.coast) {
+        display: none; }
 
     .panel {
         position: fixed;
@@ -675,10 +785,6 @@
 
     :global(body) { background: #fff; }
 
-    :not(.show-coast) :global(.coast) {
-        display: none;
-    }
-
     :global(.order) { fill: transparent; 
         pointer-events: none;
         z-index: 11; }
@@ -697,9 +803,9 @@
     }
     :global(.order.fail) {
         marker-end: url(#arrow-fail); 
-        stroke: hsl(0, 75%, 50%); }
+        stroke: hsl(0, 65%, 50%); }
     :global(.arrow-fail) {
-        fill: hsl(0, 75%, 50%); 
+        fill: hsl(0, 65%, 50%); 
     }
     :global(.unit.retreat) {
         filter: 
@@ -714,12 +820,24 @@
     :global(.arrow-retreat) { 
         fill: hsl(35, 75%, 50%); }
     :global(text), :global([id^=sc-]), :global(.unit) {
-        pointer-events: none;
-    }
+        pointer-events: none; }
+
+
+    :global(.disband line) {
+        stroke: hsl(0, 65%, 50%); }
+    :global(.build), :global(.disband) {
+        pointer-events: none; }
+    :global(.build) {
+        stroke-linejoin: round; }
 </style>
 
 <div id="map" bind:this={mapDiv} 
-    class:show-coast={current_phase && units && active_prov && units[active_prov] && ((order_mode == "move" && units[active_prov].type == "fleet") || (active_prov2 && units[active_prov2] && units[active_prov2].type == "fleet"))}></div>
+    class:no-touch={!current_phase || current_phase != active_phase}
+    class:move-none={current_phase && !isBuild(current_phase) && active_prov == null}
+    class:move-army={current_phase && !isBuild(current_phase) && active_prov && units[active_prov2 || active_prov] && units[active_prov2 || active_prov].type == "army"}
+    class:move-fleet={current_phase && !isBuild(current_phase) && active_prov && units[active_prov2 || active_prov] && units[active_prov2 || active_prov].type == "fleet"}
+    class:build-army={current_phase && isBuild(current_phase) && active_phase == current_phase && keydown.a}
+    class:build-fleet={current_phase && isBuild(current_phase) && active_phase == current_phase && keydown.f}></div>
 
 <div class="panel" id="players">
     <h3>Players</h3>
