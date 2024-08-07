@@ -38,6 +38,7 @@
                 padding-right: 16px;
             }
         </style>
+        <script crossorigin src="https://unpkg.com/@msgpack/msgpack"></script>
         <!--}-->
     </head>
     <body>
@@ -434,10 +435,10 @@
                 }
 
                 let zip = new JSZip();
-                zip.file("meta.json", JSON.stringify(meta));
+                zip.file("meta.mpk", MessagePack.encode(meta));
                 zip.file("map.svg", mapSrc);
-                zip.file("adj.json", JSON.stringify(adjData));
-                zip.file("pos.json", JSON.stringify(posData));
+                zip.file("adj.mpk", MessagePack.encode(adjData));
+                zip.file("pos.mpk", MessagePack.encode(posData));
                 zip.generateAsync({type:"base64", compression: "DEFLATE", compressionOption : { level: 2 }})
                     .then(function(base64) {
                         let a = document.createElement("a");

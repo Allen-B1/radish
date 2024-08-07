@@ -79,9 +79,9 @@ export type GamePhase = "fall" | "fall_retreat" | "spring" | "spring_retreat" | 
 
 export const PHASES = {
     "fall": "Fall",
-    "fall_retreat": "Fall (r)",
+    "fall_retreat": "Fall",
     "spring": "Spring",
-    "spring_retreat": "Spring (r)",
+    "spring_retreat": "Spring",
     "winter": "Winter"
 };
 export type GamePhaseYear = `${GamePhase}-${number}`;
@@ -113,13 +113,28 @@ export function prevPhase(gp: GamePhaseYear): GamePhaseYear {
     throw new Error("unknown phase: " + gp);
 }
 
+export function nonemptyPhase(gp: GamePhaseYear, all_mvmt_info: Record<GamePhaseYear, MvmtInfo>, iter: (gp: GamePhaseYear) => GamePhaseYear): GamePhaseYear {
+    let next = iter(gp);
+    if (isRetreat(next) && (!all_mvmt_info[prevPhase(next)] || Object.keys(all_mvmt_info[prevPhase(next)].retreats).length == 0)) {
+        return nonemptyPhase(next, all_mvmt_info, iter);
+    }
+    return next;
+}
+
+export function nextNonemptyPhase(gp: GamePhaseYear, all_mvmt_info: Record<GamePhaseYear, MvmtInfo>) : GamePhaseYear {
+    return nonemptyPhase(gp, all_mvmt_info, nextPhase);
+}
+export function prevNonemptyPhase(gp: GamePhaseYear, all_mvmt_info: Record<GamePhaseYear, MvmtInfo>) : GamePhaseYear {
+    return nonemptyPhase(gp, all_mvmt_info, prevPhase);
+}
+
 export type PressType = "full" | "rulebook" | "public" | "gunboat";
 
 export type Builds = Record<string, Unit>;
 
 export interface MvmtInfo {
     order_status: Record<string, boolean>,
-    retreats: Set<string>,
+    retreats: Record<string, RetreatOptions>
 }
 
 export function isBuild(gp: GamePhaseYear): boolean {

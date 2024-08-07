@@ -48,7 +48,7 @@ pub struct RetreatOptions {
 }
 
 /// Update the game board based on adjudication results.
-pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, order_status: &HashMap<String, bool>) -> HashMap<String, RetreatOptions> {
+pub fn apply_adjudication(map: &Map, state: &MapState, orders: &Orders, order_status: &HashMap<String, bool>) -> (MapState, HashMap<String, RetreatOptions>) {
     let mut contested = HashSet::new();
     for (prov, order) in orders.iter() {
         if order.is::<Move>() && base::compute_prevent_strength(map, state, orders, order_status, prov).min != 0 {
@@ -57,23 +57,31 @@ pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, orde
         }
     }
 
+    let mut new_state = MapState {
+        units: HashMap::new(),
+        ownership: state.ownership.clone(),
+    };
     let mut retreats = HashMap::new();
     for (prov, status) in order_status.iter() {
-        if *status {
-            if let Some(mov) = orders[prov].downcast_ref::<Move>() {
-                if state.units.contains_key(&mov.dest.0) {
-                    retreats.insert(mov.dest.0.clone(), RetreatOptions {
-                        src: state.units[&mov.dest.0].clone(),
-                        dest: HashSet::new()
-                    });
-                }
-
-                let unit = state.units.remove(prov).expect("No unit, yet there exists an order");
-                state.units.insert(mov.dest.0.clone(), match unit {
-                    Unit::Army(natl) => Unit::Army(natl),
-                    Unit::Fleet(natl, _) => Unit::Fleet(natl, mov.dest.1.clone())
+        if !(*status && orders[prov].is::<Move>()) {
+            new_state.units.insert(prov.clone(), state.units.get(prov).expect("no unit, yet there exists an order").clone());
+        }
+    }
+    for (prov, status) in order_status.iter() {
+        if *status && orders[prov].is::<Move>() {
+            let mov = orders[prov].downcast_ref::<Move>().unwrap();
+            if state.units.contains_key(&mov.dest.0) && !(orders[&mov.dest.0].is::<Move>() && order_status.get(&mov.dest.0) == Some(&true)) {
+                retreats.insert(mov.dest.0.clone(), RetreatOptions {
+                    src: state.units[&mov.dest.0].clone(),
+                    dest: HashSet::new()
                 });
             }
+
+            let unit = state.units.get(prov).expect("No unit, yet there exists an order");
+            new_state.units.insert(mov.dest.0.clone(), match unit {
+                Unit::Army(natl) => Unit::Army(natl.clone()),
+                Unit::Fleet(natl, _) => Unit::Fleet(natl.clone(), mov.dest.1.clone())
+            });
         }
     }
 
@@ -81,14 +89,14 @@ pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, orde
         match &retreat.src {
             Unit::Army(natl) => {
                 for (src, dest) in map.army_adj.iter() {
-                    if src == src_prov && !contested.contains(dest) && !state.units.contains_key(dest) {
+                    if src == src_prov && !contested.contains(dest) && !new_state.units.contains_key(dest) {
                         retreat.dest.insert((dest.to_string(), "".to_string()));
                     }
                 }
             },
             Unit::Fleet(natl, src_coast) => {
                 for (src, dest) in map.fleet_adj.iter() {
-                    if src.0 == *src_prov && src.1 == *src_coast && !contested.contains(&dest.0) && !state.units.contains_key(&dest.0) {
+                    if src.0 == *src_prov && src.1 == *src_coast && !contested.contains(&dest.0) && !new_state.units.contains_key(&dest.0) {
                         retreat.dest.insert((dest.0.to_string(),dest.1.to_string()));
                     }
                 }
@@ -96,5 +104,14 @@ pub fn apply_adjudication(map: &Map, state: &mut MapState, orders: &Orders, orde
         }
     }
 
-    retreats
+    (new_state, retreats)
+}
+
+
+pub fn count_units(map: &Map, state: &MapState, power: &str) -> usize {
+    return state.units.values().filter(|u| u.nationality() == power).count();
+}
+
+pub fn count_supply(map: &Map, state: &MapState, power: &str) -> usize {
+    return state.ownership.values().filter(|u| *u == power).count();
 }

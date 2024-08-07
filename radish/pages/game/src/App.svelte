@@ -2,7 +2,7 @@
 <script lang="ts">
     const SVG_SPEC = 'http://www.w3.org/2000/svg';
 
-    import { type AdjData, type PosData, type MapMeta, type GameMeta, type MapState, type Orders,  type MoveOrder, type Builds, type Unit, type GamePhase, type GamePhaseYear, type RetreatOptions, type MvmtInfo, PHASES, prevPhase, nextPhase, isBuild, unitNatl, isRetreat } from './defs';
+    import { type AdjData, type PosData, type MapMeta, type GameMeta, type MapState, type Orders,  type MoveOrder, type Builds, type Unit, type GamePhase, type GamePhaseYear, type RetreatOptions, type MvmtInfo, PHASES, prevPhase, nextPhase, isBuild, unitNatl, isRetreat, nextNonemptyPhase, prevNonemptyPhase } from './defs';
 
     let mapDiv: HTMLDivElement;
 
@@ -60,13 +60,15 @@
         }
     }
 
-    function unitLoc(prov: string) : string {
+    function unitLoc(prov: string, unit?: Unit) : string {
         if (active_phase == null) { return prov }
 
         // can't use units for reasons
-        let units = all_states[active_phase].units;
-        if (units && units[prov] && units[prov].type == "fleet" && units[prov].data[1] != "") {
-            return prov + "-" + units[prov].data[1]
+        if (!unit) {
+            unit = all_states[active_phase] && all_states[active_phase].units[prov];
+        }
+        if (unit && unit.type == "fleet" && unit.data[1] != "") {
+            return prov + "-" + unit.data[1]
         } else {
             return prov;
         }
@@ -74,7 +76,7 @@
 
     let active_orders: Readonly<Orders> = current_orders;
     $: {
-        active_orders = active_phase == current_phase ? current_orders : (all_orders[active_phase] || {});
+        active_orders = active_phase == current_phase ? current_orders : ((active_phase && all_orders[active_phase]) || {});
     }
     // draw orders
     $: {
@@ -89,12 +91,20 @@
             switch (order.type) {
             case "move": {
                 let src = unitLoc(prov);
+                if (active_phase && isRetreat(active_phase) && all_mvmt_info[prevPhase(active_phase)] && prov in all_mvmt_info[prevPhase(active_phase)].retreats) {
+                    src = unitLoc(prov, all_mvmt_info[prevPhase(active_phase)].retreats[prov].src);
+                }
                 let dest = order.dest[0] + "" + (order.dest[1] ? "-" + order.dest[1] : "");
 
                 let x1 = posData.provinces[src].x,
                     y1 = posData.provinces[src].y,
                     x2 = posData.provinces[dest].x,
                     y2 = posData.provinces[dest].y;
+                
+                if (active_phase && all_states[active_phase].units[prov] && isRetreat(active_phase)) {
+                    x1 += 16;
+                    y1 += 8;
+                }
 
                 let len = Math.sqrt((x1 - x2)**2 + (y1-y2)**2), new_len = Math.max(len*0.5, len - 16);
                 x2 = x1 + new_len/len*(x2-x1);
@@ -264,6 +274,35 @@
         return ratio*svgElem.viewBox.baseVal.height + svgElem.viewBox.baseVal.y;
     }
 
+    function createUnit(type: "army" | "fleet", power: string, target_x: number, target_y: number) : SVGGraphicsElement {
+        let svgBox = svgElem.getBoundingClientRect();
+
+        let prototypeElem: SVGGraphicsElement = document.getElementById(power + "-" + type) as any;
+        let cloneElem: SVGGraphicsElement = prototypeElem.cloneNode(true) as any;
+
+        cloneElem.removeAttribute("id");
+        cloneElem.classList.add("unit");
+
+        let bbox = prototypeElem.getBoundingClientRect();
+        let x = bbox.left + bbox.width/2 + window.scrollX;
+        let y = bbox.top + bbox.height/2 + window.scrollY;
+
+        let px = computeX(x / svgBox.width),
+            py = computeY(y / svgBox.height);
+
+        let tx = computeX(target_x / posData.width),
+            ty = computeY(target_y / posData.height);
+
+        cloneElem.setAttribute("transform", 
+            "translate(" + (tx-px) + "," + (ty-py) + ") " + 
+            cloneElem.getAttribute("transform")
+        );
+        prototypeElem.parentNode?.appendChild(cloneElem);
+
+        return cloneElem;
+    }
+
+    // draw units
     $: {
         let unitElems = Array.from(document.getElementsByClassName("unit"));
         for (let unit of unitElems) {
@@ -271,40 +310,37 @@
         }
 
         if (svgElem) {
-            let svgBox = svgElem.getBoundingClientRect();
-
             for (let prov in units) {
-                let posObject: { x : number, y : number };
-                let prototypeElem: SVGGraphicsElement;
+                let pos: {x : number, y: number};
                 if (units[prov].type == "army") {
-                    prototypeElem = document.getElementById(units[prov].data + "-army") as any;
-                    posObject = posData.provinces[prov]
+                    pos = posData.provinces[prov];
                 } else {
-                    prototypeElem = document.getElementById(units[prov].data[0] + "-fleet") as any;
-                    posObject = posData.provinces[prov + (units[prov].data[1] ? "-" + units[prov].data[1] : "")];
+                    pos = posData.provinces[prov + (units[prov].data[1] ? "-" + units[prov].data[1] : "")];
                 }
 
-                let cloneElem: SVGGraphicsElement = prototypeElem.cloneNode(true) as any;
+                createUnit(units[prov].type, unitNatl(units[prov]), pos.x, pos.y);
+            }
 
-                cloneElem.removeAttribute("id");
-                cloneElem.classList.add("unit");
+            if (active_phase && isRetreat(active_phase) && all_mvmt_info[prevPhase(active_phase)]) {
+                console.log("drawing retreats", all_mvmt_info[prevPhase(active_phase)].retreats);
+                for (let prov in all_mvmt_info[prevPhase(active_phase)].retreats) {
+                    let unit =  all_mvmt_info[prevPhase(active_phase)].retreats[prov].src;
+                    let pos: {x : number, y: number};
+                    if (unit.type == "army") {
+                        pos = posData.provinces[prov];
+                    } else {
+                        pos = posData.provinces[prov + (unit.data[1] ? "-" + unit.data[1] : "")];
+                    }
 
-                let bbox = prototypeElem.getBoundingClientRect();
-                let x = bbox.left + bbox.width/2 + window.scrollX;
-                let y = bbox.top + bbox.height/2 + window.scrollY;
+                    if (units[prov]) {
+                        pos = Object.assign({}, pos);
+                        pos.x += 16;
+                        pos.y += 8;
+                    }
 
-                let px = computeX(x / svgBox.width),
-                    py = computeY(y / svgBox.height);
-
-                let tx = computeX(posObject.x / posData.width),
-                    ty = computeY(posObject.y / posData.height);
-
-                cloneElem.setAttribute("transform", 
-                    "translate(" + (tx-px) + "," + (ty-py) + ") " + 
-                    cloneElem.getAttribute("transform")
-                );
-
-                prototypeElem.parentNode?.appendChild(cloneElem);
+                    let elem = createUnit(unit.type, unitNatl(unit), pos.x, pos.y);
+                    elem.classList.add("retreat");
+                }
             }
         }
     }
@@ -412,12 +448,37 @@
                 }
 
                 tileElem.addEventListener("click", (evt) => {
-                    if (current_phase != null && !isBuild(current_phase) && current_phase == active_phase) {
+                    if (current_phase == null || current_phase != active_phase) {
+                        return;
+                    }
+
+                    if (isRetreat(current_phase) && all_mvmt_info[prevPhase(current_phase)]) {
+                        console.log("retreat");
+
+                        let retreatInfo = all_mvmt_info[prevPhase(current_phase)].retreats;
+                        order_mode = "move";
+                        if (active_prov == null) {
+                            if (retreatInfo[province] && unitNatl(retreatInfo[province].src) == mePower) {
+                                active_prov = province;
+                            }
+                        } else {
+                            if (active_prov == province) {
+                                active_prov = active_prov2 = null;
+                            } else if (retreatInfo[active_prov] && retreatInfo[active_prov].dest.filter(([p, c]) => p == province && c == coast).length != 0) {
+                                current_orders[active_prov] = {
+                                    type: "move",
+                                    dest: [province, coast]
+                                };   
+                            } else if (retreatInfo[active_prov]) {
+                                console.log(retreatInfo[active_prov].dest.filter(([p, c]) => p == province && c == coast), retreatInfo[active_prov].dest);
+                            }
+                        }
+                    } else if (!isBuild(current_phase)) {
                         if (active_prov == null) {
                             if (units && units[province] && unitNatl(units[province]) == mePower) {
                                 active_prov = province;
                             }
-                        } else if (active_prov2 == null && (keydown.s || keydown.c) && !isRetreat(current_phase)) {
+                        } else if (active_prov2 == null && (keydown.s || keydown.c)) {
                             active_prov2 = province;
                             order_mode = keydown.s ? "support" : "convoy";
                         } else {
@@ -430,24 +491,27 @@
                                 } else {
                                     current_orders[active_prov] = { type: "hold" };
                                 }
-                            } else if (order_mode == "convoy" && active_prov2) {
+                            } else if ((order_mode == "convoy" || order_mode == "support") && active_prov2 && active_prov2 != province) {
                                 current_orders[active_prov] = {
-                                    type: "convoy",
+                                    type: order_mode == "convoy" ? "convoy" : "support_move",
                                     src: active_prov2,
                                     dest: province
-                                }
-                            } else if (order_mode == "support" && active_prov2) {
-                                if (active_prov2 != province) {
-                                    current_orders[active_prov] = {
-                                        type: "support_move",
-                                        src: active_prov2,
-                                        dest: province
-                                    }
-                                } else {
-                                    current_orders[active_prov] = {
-                                        type: "support_hold",
-                                        target: province
+                                };
+
+                                if (units && units[active_prov2] && unitNatl(units[active_prov2]) == mePower) {
+                                    current_orders[active_prov2] = {
+                                        type: "move",
+                                        dest: [province, coast]
                                     };
+                                }
+                            } else if (order_mode == "support" && active_prov2 && active_prov2 == province) {
+                                current_orders[active_prov] = {
+                                    type: "support_hold",
+                                    target: province
+                                };
+
+                                if ((!current_orders[province]) || current_orders[province].type == "move") {
+                                    current_orders[province] = { type: "hold" };
                                 }
                             }
 
@@ -507,7 +571,7 @@
                     retreat_orders: {}
                 };
                 all_mvmt_info[phase].order_status = msg.order_status;
-                all_mvmt_info[phase].retreats = new Set(Object.keys(msg.retreats));
+                all_mvmt_info[phase].retreats = msg.retreats;
                 break;
             }
             case "build_adj": {
@@ -637,6 +701,13 @@
     :global(.arrow-fail) {
         fill: hsl(0, 75%, 50%); 
     }
+    :global(.unit.retreat) {
+        filter: 
+            drop-shadow(1px 0 1px hsl(35, 100%, 50%))
+            drop-shadow(-1px 0 1px hsl(35, 100%, 50%))
+            drop-shadow(0 1px 1px hsl(35, 100%, 50%))
+            drop-shadow(0 -1px 1px hsl(35, 100%, 50%))
+            ; }
     :global(.order.retreat) {
         stroke: hsl(35, 75%, 50%);
         marker-end: url(#arrow-retreat); }
@@ -647,7 +718,8 @@
     }
 </style>
 
-<div id="map" bind:this={mapDiv} class:show-coast={order_mode == "move" && current_phase && units && active_prov && units[active_prov] && units[active_prov].type == "fleet"}></div>
+<div id="map" bind:this={mapDiv} 
+    class:show-coast={current_phase && units && active_prov && units[active_prov] && ((order_mode == "move" && units[active_prov].type == "fleet") || (active_prov2 && units[active_prov2] && units[active_prov2].type == "fleet"))}></div>
 
 <div class="panel" id="players">
     <h3>Players</h3>
@@ -666,16 +738,16 @@
 {#if active_phase}
 {@const year = Number(active_phase.split("-")[1])}
 <div class="panel" id="phase-panel">
-    <button on:click={() => { if (active_phase) active_phase = prevPhase(active_phase) }}>&lt;</button>
+    <button on:click={() => { if (active_phase) active_phase = prevNonemptyPhase(active_phase, all_mvmt_info) }}>&lt;</button>
     <div style="display:flex;flex-direction:column;justify-content:center">
         <div id="phase">
-            {PHASES[active_phase.split("-")[0]]} {"'" + (year < 10 ? "0" + year : year)}
+            {PHASES[active_phase.split("-")[0]]} {"'" + (year < 10 ? "0" + year : year)} {isRetreat(active_phase) ? "retreats" : ""}
         </div>
         {#if active_phase == current_phase}
         <div id="adj-time">{formatDuration(adjTime - nowDate)} left</div>
         {/if}
     </div>
-    <button on:click={() => { if(active_phase) active_phase = nextPhase(active_phase) }}>&gt;</button>
+    <button on:click={() => { if(active_phase) active_phase = nextNonemptyPhase(active_phase, all_mvmt_info) }}>&gt;</button>
 </div>
 {/if}
 

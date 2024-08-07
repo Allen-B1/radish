@@ -37,7 +37,7 @@ pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>
     let mut zip  = zip::ZipArchive::new(Cursor::new(buf))
         .map_err(|e| Redirect::to(format!("/error?details={}", encode_error(e))))?;
 
-    let meta: MapMeta = serde_json::from_reader(zip.by_name("meta.json")
+    let meta: MapMeta = rmp_serde::from_read(zip.by_name("meta.mpk")
         .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
         .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
 
@@ -51,11 +51,11 @@ pub async fn create_game_submit(cookies: &CookieJar<'_>, state: &State<AppState>
             .read_to_string(&mut map)
             .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", e)))?;
 
-        let adj: Map = serde_json::from_reader(zip.by_name("adj.json")
+        let adj: Map = rmp_serde::from_read(zip.by_name("adj.mpk")
             .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
             .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
 
-        let pos: PosData =  serde_json::from_reader(zip.by_name("pos.json")
+        let pos: PosData =  rmp_serde::from_read(zip.by_name("pos.mpk")
         .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?)
         .map_err(|e| Redirect::to(format!("/error?msg=Invalid+variant+file&details={}", encode_error(e))))?;
 
@@ -362,15 +362,21 @@ async fn game_thread(state: AppState, game_id: String) {
         let mut game = state.games.get_mut(&game_id).unwrap();
 
         let gstate = game.state.as_ref().unwrap();
-        let new_adj_time = Instant::now() + match gstate.phase.is_move() {
-            true => game.meta.time_mvmt,
-            false => game.meta.time_build
-        };
+        let new_adj_time;
+
+        // skip empty retreat phases
+        if gstate.phase.is_retreat() && gstate.mvmt_info.get(&(gstate.year, gstate.phase.mvmt())).map(|i| i.retreats.len()).unwrap_or(0) == 0 {
+            new_adj_time = Instant::now();
+        } else {
+            new_adj_time = Instant::now() + match gstate.phase.is_move() {
+                true => game.meta.time_mvmt,
+                false => game.meta.time_build
+            };
+        }
 
         let gstate = game.state.as_mut().unwrap();
         gstate.adj_time = new_adj_time;
-        drop(gstate);
-
+        
         let gstate = game.state.as_ref().unwrap();
         let epoch = Instant::now() - (SystemTime::now().duration_since(std::time::UNIX_EPOCH)).expect("unable to get system time");
         game.broadcast.send(OutMessage::Phase {
@@ -378,11 +384,11 @@ async fn game_thread(state: AppState, game_id: String) {
             adj_time: gstate.adj_time.duration_since(epoch).as_millis() as u64,
             state: gstate.current_state().clone()
         });
+
         let adj_time = gstate.adj_time;
         drop(game);
-
         time::sleep_until(adj_time).await;
-
+ 
         let mut game = state.games.get_mut(&game_id).unwrap();
         let variant = state.variants.get(&game.meta.variant).unwrap();
         let gstate = game.state.as_ref().unwrap();
@@ -404,8 +410,7 @@ async fn game_thread(state: AppState, game_id: String) {
         if gstate.phase.is_move() {
             let orders = gstate.current_orders();
             let order_status = adjudicate(&variant.adj, gstate.current_state(), orders);
-            let mut new_mstate = gstate.current_state().clone();
-            let retreats = apply_adjudication(&variant.adj, &mut new_mstate, orders, &order_status);
+            let (new_mstate, retreats) = apply_adjudication(&variant.adj, gstate.current_state(), orders, &order_status);
 
             game.broadcast.send(OutMessage::MovementAdj { 
                 year: gstate.year,
@@ -428,6 +433,9 @@ async fn game_thread(state: AppState, game_id: String) {
         } else if gstate.phase.is_retreat() {
             let mut new_mstate = gstate.current_state().clone();
             let mvmt_info = gstate.mvmt_info.get(&(gstate.year, gstate.phase.mvmt())).unwrap();
+
+            let mut retreat_units: HashMap<String, Vec<Unit>> = HashMap::new();
+
             for (prov, order) in gstate.orders.get(&(gstate.year, gstate.phase)).unwrap().iter() {
                 let mov = match order.downcast_ref::<Move>() {
                     None => continue,
@@ -437,12 +445,20 @@ async fn game_thread(state: AppState, game_id: String) {
                     None => continue,
                     Some(r) => r
                 };
-                if retreats.dest.contains(&(mov.dest.0.clone(), mov.dest.1.clone())) {
-                    let new_unit = match &retreats.src {
-                        Unit::Army(natl) => Unit::Army(natl.clone()),
-                        Unit::Fleet(natl, _) => Unit::Fleet(natl.clone(), mov.dest.1.clone())
-                    };
-                    new_mstate.units.insert(mov.dest.0.clone(), new_unit);
+                if !retreats.dest.contains(&(mov.dest.0.clone(), mov.dest.1.clone())) {
+                    continue;
+                }
+
+                let vec = retreat_units.entry(mov.dest.0.to_string()).or_default();
+                vec.push(match &retreats.src {
+                    Unit::Army(natl) => Unit::Army(natl.clone()),
+                    Unit::Fleet(natl, _) => Unit::Fleet(natl.clone(), mov.dest.1.clone())
+                });
+            }
+
+            for (prov, units) in retreat_units {
+                if units.len() == 1 {
+                    new_mstate.units.insert(prov, units.into_iter().next().unwrap());
                 }
             }
 
@@ -506,9 +522,12 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
                 drop(game);
                 let mut game = state.games.get_mut(game_id).ok_or(())?;   
                 if !game.player_broadcast.contains_key(&tok) {
-                    let (send, _) = broadcast::channel(16);
-                    game.player_broadcast.insert(tok.clone(), send);
-                    _ = game.broadcast.send(OutMessage::UpdatePlayers { players: game.player_broadcast.keys().map(|id| state.users.get(id).map(|p| p.name.clone()).unwrap_or("".to_string())).map(|n| ("".to_string(), n.to_string())).collect() });    
+                    let (sender, _) = broadcast::channel(16);
+                    game.player_broadcast.insert(tok.clone(), sender);
+
+                    let update_players_msg = OutMessage::UpdatePlayers { players: game.player_broadcast.keys().map(|id| state.users.get(id).map(|p| p.name.clone()).unwrap_or("".to_string())).map(|n| ("".to_string(), n.to_string())).collect() };
+                    _ = game.broadcast.send(update_players_msg.clone());
+                    send(stream, update_players_msg).await;  
 
                     let variant = state.variants.get(&game.meta.variant).unwrap();
                     if game.player_broadcast.len() == variant.meta.powers.len() {
@@ -621,7 +640,7 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
 
             let gstate = game.state.as_mut().unwrap();
             if gstate.phase.is_build() {
-                send(stream, OutMessage::Error { msg: "Not a build phase".to_string() }).await;
+                send(stream, OutMessage::Error { msg: "Not a movement or retreat phase".to_string() }).await;
                 return Ok(())
             }
 
@@ -631,11 +650,42 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
             }
 
             // authenticate 
-            for (prov, order) in orders.iter() {
+            if gstate.phase.is_move() {
                 let power = gstate.players[token].as_str();
-                if gstate.current_state().units.get(prov).map(|u| u.nationality()).unwrap_or("".to_string()) != power {       
-                    send(stream, OutMessage::Error { msg: format!("Invalid orderset: you do not have a unit at {}", prov) }).await;
-                    return Ok(())
+                for (prov, order) in orders.iter() {
+                    if gstate.current_state().units.get(prov).map(|u| u.nationality()).unwrap_or("".to_string()) != power {       
+                        send(stream, OutMessage::Error { msg: format!("Invalid orderset: you do not have a unit at {}", prov) }).await;
+                        return Ok(())
+                    }
+                }
+            } else {
+                let power = gstate.players[token].as_str();
+                for (prov, order) in orders.iter() {
+                    let mov = match order.downcast_ref::<Move>() {
+                        Some(mov) => mov,
+                        None => {
+                            send(stream, OutMessage::Error { msg: format!("Invalid orderset: only move orders allowed during adjudication") }).await;
+                            return Ok(())    
+                        }
+                    };
+
+                    let info = match  gstate.mvmt_info.get(&(gstate.year, gstate.phase.mvmt())) {
+                        Some(info) => info,
+                        None => {
+                            send(stream, OutMessage::Error { msg: format!("Movement info not found") }).await;
+                            return Ok(())    
+                        }
+                    };
+
+                    if info.retreats.get(prov).is_none() || !info.retreats[prov].dest.contains(&mov.dest) {
+                        send(stream, OutMessage::Error { msg: format!("Cannot retreat {} to {}", prov, &mov.dest.0) }).await;
+                        return Ok(())    
+                    }
+
+                    if info.retreats[prov].src.nationality() != power {
+                        send(stream, OutMessage::Error { msg: format!("{} is {}, you are {}", prov, info.retreats[prov].src.nationality(), power) }).await;
+                        return Ok(())    
+                    }
                 }
             }
 
