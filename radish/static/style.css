@@ -146,3 +146,11 @@ input[type=color]:active {
     display: block;  }
 .folder:target > .folder-title {
     background: hsl(330, 50%, 45%); }
+
+code {
+    display: inline-block;
+    font-size: 14px;
+    background: hsla(200, 10%, 50%, 0.2);
+    padding: 4px 8px;
+    margin: 2px 0;
+}

@@ -792,7 +792,7 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
     }
 
     Ok(())
-}
+} 
 
 #[get("/games/<id>/ws")]
 pub fn game_stream(state: &State<AppState>, id: &str, ws: ws::WebSocket) -> Result<ws::Channel<'static>, Status> {

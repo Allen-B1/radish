@@ -77,8 +77,15 @@
             <div class="folder" id="folder-3">
                 <a class="folder-title" href="#folder-3">3: Update Map File</a>
                 <div class="folder-content">
-
-                    <p>Update your map file.</p>
+                    <p>Make the following changes to your Inkscape file, then upload it.</p>
+                    <ol>
+                        <li>Set the id of each land province to <code>ProvAbbr</code>.</li>
+                        <li>Set the id of each supply center marker to <code>sc-ProvAbbr</code>,</li>
+                        <li>Set the id of each starting unit to <code>army-ProvAbbr</code>, <code>fleet-ProvAbbr</code>, or <code>fleet-ProvAbbr-coast</code>.</li>
+                        <li>For each power, create objects with id <code>PowerAbbr-fleet</code> and <code>PowerAbbr-army</code>.
+                            <strong>Do not hide these objects; instead, move them outside the boundary of the map.</strong>
+                        </li>
+                    </ol>
                     <input id="upload_map" type="file" required accept="image/svg+xml">
                     <img style="width:100%" id="map-img">
                     <a class="button" href="#folder-4">Next</a>
