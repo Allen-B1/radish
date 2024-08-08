@@ -907,12 +907,14 @@
                 {#if player[0]}<div class="power-user">{player[1]}</div>{/if}
             </div>
 
-            {#if active_phase && isBuild(active_phase)}
-            {@const n_units = Object.values(units).filter(u => unitNatl(u) == player[0]).length}
-                <span class="power-builds">{n_supply - n_units > 0 ? "+" : ""}{n_supply - n_units}</span>
-            {/if}
+            {#if player[0]}
+                {#if active_phase && isBuild(active_phase)}
+                {@const n_units = Object.values(units).filter(u => unitNatl(u) == player[0]).length}
+                    <span class="power-builds">{n_supply - n_units > 0 ? "+" : ""}{n_supply - n_units}</span>
+                {/if}
 
-        <span class="power-sc">{n_supply}</span>
+                <span class="power-sc">{n_supply}</span>
+            {/if}
         </div>
     {/each}
 </div>
