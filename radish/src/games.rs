@@ -1,11 +1,11 @@
 use std::{collections::{HashMap, HashSet}, future::pending, hash::Hash, io::{Cursor, Read}, time::{SystemTime, UNIX_EPOCH}};
 use rand::prelude::*;
-use radip::{adjudicate, base::{self, Hold, Move}, utils::{apply_adjudication, count_supply, count_units, MapMeta, RetreatOptions}, Map, MapState, Orders, ProvinceAbbr, Unit};
+use radip::{adjudicate, base::{self, Hold, Move}, utils::{apply_adjudication, count_supply, count_units, disband_cd, MapMeta, RetreatOptions}, Map, MapState, Orders, ProvinceAbbr, Unit};
 use rocket::{build, form::Form, fs::{NamedFile, TempFile}, futures::{SinkExt, StreamExt}, http::{CookieJar, Status}, response::{content::RawHtml, Redirect}, serde::{json::Json, Deserialize, Serialize}, tokio::{io::AsyncReadExt, select, sync::broadcast, time::{Duration, Instant}}, State};
 use tokio::{sync::broadcast::error::RecvError, time};
 use ws::{stream::DuplexStream, Message};
 
-use crate::{encode_error, gen_id, AppState, HeadComponent, HeaderComponent, Variant};
+use crate::{encode_error, gen_id, variant_adj, AppState, HeadComponent, HeaderComponent, Variant};
 
 #[litem::template("pages/create_game.html")]
 struct CreateGamePage {
@@ -503,12 +503,16 @@ async fn game_thread(state: AppState, game_id: String) {
             }
         } else if gstate.phase.is_build() {
             let mut new_mstate = gstate.current_state().clone();
-            let builds  =HashMap::new();
-            let builds = gstate.builds.get(&(gstate.year, gstate.phase.mvmt())).unwrap_or(&builds);
+            let mut builds = gstate.builds.get(&(gstate.year, gstate.phase.mvmt())).map(|c| c.clone()).unwrap_or_else(HashMap::new);
+
             for (prov, build) in builds.iter() {
-                let power = match new_mstate.ownership.get(prov) {
-                    Some(power) => power,
-                    None => continue
+                let power = match match build {
+                        // safe to use new_mstate since units won't move
+                        Build::Disband => new_mstate.units.get(prov).map(|u| u.nationality()),
+                        _ => new_mstate.ownership.get(prov).map(|s| s.to_string())
+                    } {
+                    None => continue,
+                    Some(power) => power
                 };
                 match build {
                     Build::Army => new_mstate.units.insert(prov.to_string(), Unit::Army(power.to_string())),
@@ -517,7 +521,20 @@ async fn game_thread(state: AppState, game_id: String) {
                 };
             }
 
-            // TODO: check supply count
+            // additional disbands
+            for power in variant.meta.powers.keys() {
+                let supply = count_supply(&new_mstate, &power);
+                let units = count_units(&new_mstate, &power);
+                if units > supply {
+                    for i in 0..(units - supply)  {
+                        let unit: String = disband_cd(&variant.adj, &new_mstate, variant.meta.provinces.iter()
+                        .filter(|(prov, meta)| meta.home_sc == *power)
+                        .map(|(prov, _) | prov.as_str()), &power).unwrap();
+                        new_mstate.units.remove(&unit);
+                        builds.insert(unit, Build::Disband);
+                    }
+                }
+            }
 
             game.broadcast.send(OutMessage::BuildAdj { 
                 year: gstate.year,
@@ -526,6 +543,7 @@ async fn game_thread(state: AppState, game_id: String) {
             });
 
             let gstate = game.state.as_mut().unwrap();
+            gstate.builds.insert((gstate.year, gstate.phase), builds);
             (gstate.phase, gstate.year) = gstate.phase.next(gstate.year);
             gstate.states.insert((gstate.year, gstate.phase), new_mstate);
             gstate.orders.insert((gstate.year, gstate.phase), HashMap::new());
@@ -633,6 +651,7 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
                 send(stream, OutMessage::Error { msg: "Not authenticated".to_string() }).await;
                 return Ok(())
             }
+            let variant_id = game.meta.variant.clone();
 
             let gstate = game.state.as_mut().unwrap();
             if !gstate.phase.is_build() {
@@ -641,19 +660,47 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
             }
 
             let power = &gstate.players[&*token];
-            for (prov, build) in builds {
-                if gstate.current_state().units.contains_key(&prov) {
+
+            let mstate = gstate.states.get(&(gstate.year, gstate.phase)).unwrap();
+            let supply = count_supply(mstate, power);
+            let units = count_units(mstate, power);
+            if supply < units {
+                let n_disbands = units - supply;
+                if builds.len() > n_disbands {
+                    send(stream, OutMessage::Error { msg: format!("{} disbands, but you only have {}", builds.len(), n_disbands) }).await;
+                    return Ok(())
+                }
+            } else if supply > units {
+                let n_builds = supply - units;
+                if builds.len() > n_builds {
+                    send(stream, OutMessage::Error { msg: format!("{} builds, but you only have {}", builds.len(), n_builds) }).await;
+                    return Ok(())
+                }
+            }
+
+            // remove previous builds
+            for prov in mstate.units.iter().filter(|(_, u)| u.nationality() == *power).map(|(p, _)| p.clone()).chain(
+                mstate.ownership.iter().filter(|(p, pwr)| **pwr == *power && !mstate.units.contains_key(*p))
+                .map(|(p, _)| p.clone())
+            ) {
+                gstate.builds.entry((gstate.year, gstate.phase)).or_default().remove(&prov);
+            }
+
+            let variant = state.variants.get(&variant_id).expect("variant doesn't exist");
+            for (prov, build) in builds.iter() {
+                if gstate.current_state().units.contains_key(prov) && supply > units {
                     send(stream, OutMessage::Error { msg: format!("Build location {} is occupied", &prov) }).await;
                     return Ok(())           
                 }
-                if gstate.current_state().ownership.get(&prov) != Some(power) {
+                if gstate.current_state().ownership.get(prov) != Some(power) && supply > units {
                     send(stream, OutMessage::Error { msg: format!("Build location {} is not owned by you", &prov) }).await;
                     return Ok(())
                 }
+                if variant.meta.provinces[prov].home_sc != *power && supply > units {
+                    send(stream, OutMessage::Error { msg: format!("Build location {} is not a home center", &prov) }).await;
+                    return Ok(())
+                }
 
-                let mstate = gstate.current_state();
-                let supply = count_supply(mstate, power);
-                let units = count_units(mstate, power);
                 match &build {
                     Build::Disband => if !(supply < units) {
                         send(stream, OutMessage::Error { msg: format!("No disbands; can't disband {}", &prov) }).await;
@@ -665,10 +712,9 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
                         send(stream, OutMessage::Error { msg: format!("No builds; can't build F {}", &prov) }).await;
                     },
                 }
-
-                let builds = gstate.builds.entry((gstate.year, gstate.phase)).or_insert(HashMap::new());
-                builds.insert(prov, build);
             }
+
+            gstate.builds.entry((gstate.year, gstate.phase)).or_default().extend(builds);
         },
         InMessage::Orders { orders } => {
             let mut game = state.games.get_mut(game_id).ok_or(())?;   

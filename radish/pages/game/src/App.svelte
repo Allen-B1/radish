@@ -286,6 +286,8 @@
         if (active_phase && all_states[active_phase]) {
             units = all_states[active_phase].units;
 //            console.log("units", units);
+        } else if (metaData) {
+            units = metaData.starting_state.units;
         } else {
             units = {};
         }
@@ -339,6 +341,7 @@
         let prototypeElem: SVGGraphicsElement = document.getElementById(power + "-" + type) as any;
         let cloneElem: SVGGraphicsElement = prototypeElem.cloneNode(true) as any;
 
+        cloneElem.style.display = "";
         cloneElem.removeAttribute("id");
         cloneElem.classList.add("unit");
 
@@ -600,9 +603,13 @@
                     } else if (isBuild(current_phase) && all_states[current_phase] && units) {
                         let n_units = Object.values(units).filter(u => unitNatl(u) == mePower).length;
                         let n_supply = Object.values(all_states[current_phase].ownership).filter(p => p == mePower).length;
+                        let n_builds = Math.abs(n_units - n_supply);
 
                         if (n_supply < n_units && units[province]) {
                             if (!current_builds[province]) {
+                                if (Object.keys(current_builds).length >= n_builds) {
+                                    return;
+                                }
                                 current_builds[province] = { type: "disband" };
                             } else {
                                 delete current_builds[province];
@@ -610,9 +617,16 @@
                             }
                         } else if (n_supply > n_units && !units[province] && all_states[current_phase].ownership[province] == mePower) {
                             if (!current_builds[province]) {
+                                if (Object.keys(current_builds).length >= n_builds) {
+                                    return;
+                                }
+                                if (metaData.provinces[province].home_sc != mePower || all_states[current_phase].ownership[province] != mePower) {
+                                    console.log(province, metaData.provinces[province].home_sc);
+                                    return;
+                                }
                                 if (keydown.f) {
                                     current_builds[province] = { type: "fleet", coast: coast };
-                                } else {
+                                } else if (keydown.a) {
                                     current_builds[province] = { type: "army" };
                                 }
                             } else {
@@ -750,16 +764,39 @@
     .panel h3 {
         margin-top: 0;
         text-align: center;
+        font-size: 18px;
     }
 
+    #players {
+        padding: 0;
+        padding-bottom: 16px;
+        width: 320px; }
+    #players h3 {
+        padding: 16px;
+        padding-bottom: 8px;
+        margin: 0; }
     .player {
         display: flex;
         align-items: center;
         flex-direction: row; }
-    .power-color { width: 8px; height: 32px; display: inline-block; margin-right: 8px; }
+    .player.me { color: #000; }
+    .power-color { width: 16px; align-self: stretch; display: inline-block; }
     .power-name {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        justify-content: center;
+        padding: 4px 16px;
         flex-grow: 1; }
-    .me .power-name { font-weight: bold;}
+    .power-country { font-size: 16px; }
+    .power-user { font-size: 13px; margin-top: 0; }
+    .player > span:not(.power-color) {
+        padding: 8px 16px;
+        margin: 0;
+        padding-bottom: 8px;
+        text-align: center;
+        font-size: 16px;
+    }
 
     #phase-panel {
         left: 50%;
@@ -829,6 +866,24 @@
         pointer-events: none; }
     :global(.build) {
         stroke-linejoin: round; }
+
+    #status-panel {
+        padding: 0;
+        position: fixed;
+        bottom: 16px; left: 16px;
+        top: auto;
+        display: flex;
+        flex-direction: row;
+        width: 256px;
+    }
+    #status-panel > div {
+        flex-grow: 1;
+        padding: 8px 16px;
+        text-align: center;
+    }
+    #status-panel > div.active {
+        background: hsl(330, 50%, 45%);
+    }
 </style>
 
 <div id="map" bind:this={mapDiv} 
@@ -842,13 +897,22 @@
 <div class="panel" id="players">
     <h3>Players</h3>
     {#each playerList as player}
-        <div class="player" class:me={player[0] == mePower}>
+        {@const n_supply = active_phase && all_states[active_phase] && Object.values(all_states[active_phase].ownership).filter(p => p == player[0]).length || 0}
+        <div class="player" class:me={mePower && player[0] == mePower} style:background={mePower && player[0] == mePower ? metaData.powers[mePower].tile_color : ""}>
             {#if player[0]}
             <span style={"background:" + metaData.powers[player[0]].sc_color} class="power-color"></span>
             {/if}
-            <span class="power-name">
-                {player[1]}
-            </span>
+            <div class="power-name">
+                <div class="power-country">{player[0] ? (metaData.powers[player[0]].name || player[0]) : player[1]}</div>
+                {#if player[0]}<div class="power-user">{player[1]}</div>{/if}
+            </div>
+
+            {#if active_phase && isBuild(active_phase)}
+            {@const n_units = Object.values(units).filter(u => unitNatl(u) == player[0]).length}
+                <span class="power-builds">{n_supply - n_units > 0 ? "+" : ""}{n_supply - n_units}</span>
+            {/if}
+
+        <span class="power-sc">{n_supply}</span>
         </div>
     {/each}
 </div>
@@ -866,6 +930,21 @@
         {/if}
     </div>
     <button on:click={() => { if(active_phase) active_phase = nextNonemptyPhase(active_phase, all_mvmt_info) }}>&gt;</button>
+</div>
+{/if}
+
+{#if active_phase == current_phase && current_phase}
+<div class="panel" id="status-panel">
+    {#if !isBuild(active_phase)}
+    {@const mode = (keydown.c || order_mode == "convoy") ? "convoy" : (keydown.s || order_mode == "support") ? "support" : "move"}
+    <div class:active={mode == "move"}>Move</div>
+    <div class:active={mode == 'convoy'}>Convoy</div>
+    <div class:active={mode == 'support'}>Support</div>
+    {/if}
+    {#if isBuild(active_phase)}
+    <div class:active={keydown.a}>Army</div>
+    <div class:active={keydown.f}>Fleet</div>
+    {/if}
 </div>
 {/if}
 

@@ -59,7 +59,8 @@ export interface MapMeta {
     data: {
         land_color: string,
         id: string,
-    }
+    },
+    starting_state: MapState,
 }
 
 export interface PosData {
