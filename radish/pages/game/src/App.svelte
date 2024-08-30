@@ -823,7 +823,7 @@
 
     :global(.order) { fill: transparent; 
         pointer-events: none;
-        z-index: 11; }
+        z-index: 20; }
     :global(.hold.order) { 
         --arrow-color: #000;
         stroke: #000;
@@ -832,9 +832,11 @@
         stroke: #000;
         marker-end: url(#arrow);
     }
-    :global(.convoy.order) { stroke: hsl(240, 50%, 35%); }
+    :global(.convoy.order) {
+        z-index: 21;
+        stroke: hsl(240, 50%, 35%); }
     :global(.support) {
-        z-index: 12;
+        z-index: 21;
         stroke: #000;
     }
     :global(.order.fail) {
@@ -842,6 +844,9 @@
         stroke: hsl(0, 65%, 50%); }
     :global(.arrow-fail) {
         fill: hsl(0, 65%, 50%); 
+    }
+    :global(.unit) {
+        z-index: 15;
     }
     :global(.unit.retreat) {
         filter: 
@@ -858,8 +863,8 @@
     :global(text), :global([id^=sc-]), :global(.unit) {
         pointer-events: none; }
 
-
     :global(.disband line) {
+        z-index: 21;
         stroke: hsl(0, 65%, 50%); }
     :global(.build), :global(.disband) {
         pointer-events: none; }

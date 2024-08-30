@@ -61,12 +61,13 @@ pub fn apply_adjudication(map: &Map, state: &MapState, orders: &Orders, order_st
         units: HashMap::new(),
         ownership: state.ownership.clone(),
     };
-    let mut retreats = HashMap::new();
     for (prov, status) in order_status.iter() {
         if !(*status && orders[prov].is::<Move>()) {
             new_state.units.insert(prov.clone(), state.units.get(prov).expect("no unit, yet there exists an order").clone());
         }
     }
+
+    let mut retreats = HashMap::new();
     for (prov, status) in order_status.iter() {
         if *status && orders[prov].is::<Move>() {
             let mov = orders[prov].downcast_ref::<Move>().unwrap();
@@ -89,14 +90,16 @@ pub fn apply_adjudication(map: &Map, state: &MapState, orders: &Orders, order_st
         match &retreat.src {
             Unit::Army(natl) => {
                 for (src, dest) in map.army_adj.iter() {
-                    if src == src_prov && !contested.contains(dest) && !new_state.units.contains_key(dest) {
+                    if src == src_prov && !contested.contains(dest) && !new_state.units.contains_key(dest) 
+                        && !(orders.contains_key(dest) && orders[dest].is::<Move>() && order_status.get(dest) == Some(&true) && orders[dest].downcast_ref::<Move>().unwrap().dest.0 == *src_prov) {
                         retreat.dest.insert((dest.to_string(), "".to_string()));
                     }
                 }
             },
             Unit::Fleet(natl, src_coast) => {
                 for (src, dest) in map.fleet_adj.iter() {
-                    if src.0 == *src_prov && src.1 == *src_coast && !contested.contains(&dest.0) && !new_state.units.contains_key(&dest.0) {
+                    if src.0 == *src_prov && src.1 == *src_coast && !contested.contains(&dest.0) && !new_state.units.contains_key(&dest.0) 
+                    && !(orders.contains_key(&dest.0) && orders[&dest.0].is::<Move>() && order_status.get(&dest.0) == Some(&true) && orders[&dest.0].downcast_ref::<Move>().unwrap().dest.0 == *src_prov) {
                         retreat.dest.insert((dest.0.to_string(),dest.1.to_string()));
                     }
                 }
