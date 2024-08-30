@@ -884,6 +884,13 @@
     #status-panel > div.active {
         background: hsl(330, 50%, 45%);
     }
+
+    #map { 
+        display: flex;
+        height: 100vh;
+        align-items: center;
+        justify-content: center;
+    }
 </style>
 
 <div id="map" bind:this={mapDiv} 
