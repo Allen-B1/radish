@@ -346,8 +346,8 @@
         cloneElem.classList.add("unit");
 
         let bbox = prototypeElem.getBoundingClientRect();
-        let x = bbox.left + bbox.width/2 + window.scrollX;
-        let y = bbox.top + bbox.height/2 + window.scrollY;
+        let x = bbox.left + bbox.width/2 - svgBox.left;
+        let y = bbox.top + bbox.height/2 - svgBox.top;
 
         let px = computeX(x / svgBox.width),
             py = computeY(y / svgBox.height);
@@ -355,10 +355,9 @@
         let tx = computeX(target_x / posData.width),
             ty = computeY(target_y / posData.height);
 
-        cloneElem.setAttribute("transform", 
-            "translate(" + (tx-px) + "," + (ty-py) + ") " + 
-            cloneElem.getAttribute("transform")
-        );
+        let transform = svgElem.createSVGTransform();
+        transform.setTranslate((tx-px), (ty-py));
+        cloneElem.transform.baseVal.insertItemBefore(transform, 0);
         prototypeElem.parentNode?.appendChild(cloneElem);
 
         return cloneElem;

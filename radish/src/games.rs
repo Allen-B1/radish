@@ -634,6 +634,10 @@ async fn handle_in_message(state: &AppState, game_id: &str, token: &mut String, 
                     send(stream, OutMessage::UpdatePlayers {
                         players: gstate.players.iter().map(|(tok, pwr)| (pwr.to_string(), state.users.get(tok).unwrap().name.to_string())).collect()
                     }).await;
+                } else {
+                    send(stream, OutMessage::UpdatePlayers {
+                        players: game.player_broadcast.iter().map(|(tok, _)| ("".to_string(), state.users.get(tok).unwrap().name.to_string())).collect()
+                    }).await;
                 }
 
                 println!("done sending starting info");
