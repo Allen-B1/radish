@@ -345,7 +345,10 @@
         cloneElem.removeAttribute("id");
         cloneElem.classList.add("unit");
 
+        let display = prototypeElem.style.display;
+        prototypeElem.style.display = "";
         let bbox = prototypeElem.getBoundingClientRect();
+        prototypeElem.style.display = display;
         let x = bbox.left + bbox.width/2 - svgBox.left;
         let y = bbox.top + bbox.height/2 - svgBox.top;
 
