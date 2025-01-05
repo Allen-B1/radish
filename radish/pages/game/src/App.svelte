@@ -891,12 +891,9 @@
     #status-panel > div.active {
         background: hsl(330, 50%, 45%);
     }
-
-    #map { 
-        display: flex;
-        height: 100vh;
-        align-items: center;
-        justify-content: center;
+    #map > :global(svg) {
+        display: block;
+        margin: auto;
     }
 </style>
 
